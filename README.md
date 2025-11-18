@@ -1,4 +1,4 @@
-Monochrome Academic Website (Linear)
+Monochrome Academic Website
 ===================================
 
 Overview
