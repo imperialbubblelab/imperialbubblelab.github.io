@@ -23,7 +23,7 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--fg);
-  font-family: "LMRoman9","Meta", Helvetica, Arial, sans-serif;
+  font-family: "Meta", Helvetica, Arial, sans-serif;
   line-height: 1.55;
 }
 
@@ -86,7 +86,7 @@ ul.tight li { margin-bottom: .25rem; }
 
 .pubs { list-style: decimal; }
 .pubs li { margin: 0 0 .75rem 0; }
-.pub-title { font-weight: 700; }
+.pub-title { font-style: italic; font-weight: normal; }
 
 a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
 a:hover, a:focus { text-decoration-thickness: 2px; }
