@@ -193,3 +193,34 @@ a:hover, a:focus { text-decoration-thickness: 2px; }
   height: auto;
   /* filter: grayscale(1) contrast(1.1); */
 }
+
+/* About page two-column layout */
+.about-layout {
+  display: flex;
+  flex-direction: row;
+  gap: 2rem;
+  align-items: flex-start;
+  flex-wrap: nowrap;
+}
+.about-content {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.about-image {
+  flex: 0 0 auto;
+  width: 300px;
+}
+.about-image img {
+  width: 100%;
+  height: auto;
+  border-radius: 8px;
+}
+
+@media (max-width: 768px) {
+  .about-layout {
+    flex-direction: column;
+  }
+  .about-image {
+    width: 100%;
+  }
+}
