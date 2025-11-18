@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="Introducing BubbleLab — Blog Post." />
+    <title>Introducing BubbleLab — BubbleLab Blog</title>
+    <link rel="stylesheet" href="../styles.css" />
+    <link rel="stylesheet" href="../vendor/katex/katex.min.css" />
+  </head>
+  <body>
+    <a class="skip" href="#main">Skip to content</a>
+    <main id="main" class="page" role="main">
+      <div data-include="../partials/header.html"></div>
+
+      <article class="section">
+        <h2>Sparsity: The Art of Knowing What to Ignore</h2>
+        <p><time datetime="2025-09-29">01 Oct 2025</time></p>
+        <p>
+          I have been trying to create a personal website or blog for a while now, but for various reasons I have put it off. "Design not right", "I don't know if I should write about X" or even more philosophical, "Do I have <em>anything</em> interesting to say?". But here we are, <em>a brave new world! </em> <br><br>
+
+          I think it's fair to say that, deep down, we all want to cut through in some way or another. Tech bros (and presumably electrical engineers) say "Signal-to-noise ratio", editors say "kill your darlings", and the ancient Chinese philosopher may say "画龙点睛" (adding eyes to the painted dragon), to each their own.
+          
+          <br><br>
+
+          When you solve a problem well, you are sparse with your solution, with clear logic. When you are struggling, the attempts take on a Jackson Pollock quality as you navigate the various unproductive chains of thought. In some sense, the sparse solution is the most efficient in a particular problem space and we <em>technically</em> should strive to become sparse in our thought processes (but is this always true?). But, to define sparsity itself rigorously is surprisingly difficult! The sparse matrix definition on wikipedia is simply, 
+          
+          <blockquote><em>"a sparse matrix is a matrix in which most of the elements are zero."</em></blockquote>Most?! That precision! That rigour! <br><br>
+
+          We examine three examples of sparsity:<br><br>
+          
+          <b>Example 1: <em>Tell all the truth but tell it slant</em> by Emily Dickinson (1263)</b><br><br>
+          <div style="max-width: 400px; margin: 0 auto; text-align: left;">
+            Tell all the truth but tell it slant —<br>
+            Success in Circuit lies<br>
+            Too bright for our infirm Delight<br>
+            The Truth's superb surprise<br>
+            As Lightning to the Children eased<br>
+            With explanation kind<br>
+            The Truth must dazzle gradually<br>
+            Or every man be blind —<br><br>
+          </div>
+
+          The genius bit of this poem is that it doesn't explain sparsity, <em>it is sparse</em>. "The Truth must dazzle gradually / Or every man be blind ", maximum signal delivered at exactly the rate the receiver can handle, too much signal too fast just becomes noise again. This is sparsity as an optimisation problem: find the minimum viable words that carry the maximum viable meaning. Every element must earn its place. Even the em dashes are not merely decorative, they are the compression algorithm - the spaces where you fill in the connection yourself. <br><br>
+
+          <b>Example 2: SINDy: Sparse Identification of Nonlinear Dynamics, Brunton et al. 2016</b><br><br>
+
+          If Dickinson showed us sparsity in language, SINDy shows us sparsity in nature itself. SINDy  watches a complex system evolve: a swinging pendulum, a chemical reaction, fluid dynamics - and reverse engineers the equation governing it. But rather than fitting an otherwise unremarkable equation to it, it gives you the <em>sparsest</em> equation that fits. <br><br>
+
+          Suppose you are trying to play modern day Newton (sans wig) and explain planetary motion. You could write down a polynomial with a hundred terms that perfectly predicts every measurement. Or you could write $F = GMm/r^2$. SINDy hunts for the latter, as it assumes, correctly, that the universe is lazy. Physical laws <em>tend</em> to be simple, a handful of terms, not hundreds (spot the weasel word).<br><br>
+
+          The algorithm builds a massive library of candidate terms, $x, x^2, x^3, \sin (x), \dot{x}, \ddot{x}$, and so on. Then it uses sparse regression to ruthlessly eliminate terms until only the essential ones remain. Most coefficients go to zero, the signal emerges from the noise. For example, a damped pendulum may start with 50 terms, but the sparse regression algorithm converges to just three: angular acceleration, damping friction, and the restoring force. Forty-seven terms eliminated. Three physical principles that actually matter. <br><br> 
+
+          Nature, it would seem, has read Dickinson.<br><br> 
+
+          <b>Example 3: Deepseek Sparse Attention, 2025</b><br>
+
+          What if attention could also be sparse? Since "<em>Attention is all you need</em>", the modern large language models have built on the standard attention mechanisms that compare every token to every other token. For a sequence of length $L$, that is $O(L^2)$ operations. For example, a short book such as Asimov's Foundation reaches around 128k tokens, that would be 16 billion comparisons. Most of them are useless.<br><br>
+
+          DeepSeek Sparse Attention (DSA) makes the bet that most attention weights are basically zero anyway, so why compute them. Instead, predict which tokens actually matter, compute attention for only these and ignore the rest. <br><br>
+
+          Two components, an indexer and a token selection mechanism, are at work. The former computes a simple scoring function against all previous tokens (i.e. a weighted sum of ReLU-activated dot products across a small number of indexer heads), a cheap first pass which determines "which tokens might be important". The latter mechanism then takes these scores and keeps only the top-$k$. In the DeepSeek implementation, $k=2048$ out of potentially 128k tokens, which is $1.6\%$. The actual expensive attention mechanism, then only runs on these selected tokens. The result is a reduction in complexity from $O(L^2)$ to $O(Lk)$. For long contexts, this is the difference between "impossibly slow" and "useable".<br><br>
+
+          What makes this rather nice is the same principle we saw in SINDy: the sparse solution is often the true solution. When they trained the indexer, they didn't teach it to randomly select tokens. They taught it to match the attention patterns the full model would have computed and it turns out most of those attention weights were near zero anyway. The model naturally wanted to be sparse; DeepSeek made it explicit. <br><br>
+
+          So, what do we conclude from these examples? Sparsity is doing less wrong. The defining struggle of our time: drowning in information. Every project arrives wrapped in infinite possibilities, infinite doubt, infinite ways to overthink yourself into a five-year blog-less existence. And sometimes, you just need to paint the dragon's eyes and see if it flies.<br><br>
+          
+          <br>
+
+
+
+
+
+
+        </p>
+
+      </article>
+
+      <div data-include="../partials/footer.html"></div>
+    </main>
+    <script src="../scripts/include.js"></script>
+    <script src="../vendor/katex/katex.min.js"></script>
+    <script src="../vendor/katex/contrib/auto-render.min.js"></script>
+    <script>
+      (function () {
+        if (window.renderMathInElement) {
+          window.renderMathInElement(document.body, {
+            delimiters: [
+              { left: '$$', right: '$$', display: true },
+              { left: '$', right: '$', display: false }
+            ],
+            throwOnError: false
+          });
+        }
+      })();
+    </script>
+  </body>
+  </html>
+

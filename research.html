@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="Research — BubbleLab." />
+    <title>BubbleLab — Research</title>
+    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="vendor/katex/katex.min.css" />
+  </head>
+  <body>
+    <a class="skip" href="#main">Skip to content</a>
+    <main id="main" class="page" role="main">
+      <div data-include="partials/header.html"></div>
+        <figure class="hero">
+          <img src="assets/bubble2.jpg" alt="BubbleLab illustrative image" />
+        </figure>
+      <section class="section">
+
+        <h2>Research</h2>
+        <p>
+          Concise statement of research interests and approach. Emphasize the
+          core ideas you work on and the problems you care about.
+        </p>
+        <p>Inline demo: Einstein’s equation $E=mc^2$.</p>
+        <div>$$\int_{-\infty}^{\infty} e^{-x^2}\,dx = \sqrt{\pi}$$</div>
+        <ul class="tight">
+          <li>Area A — specific focus and method.</li>
+          <li>Area B — specific focus and method.</li>
+          <li>Area C — specific focus and method.</li>
+        </ul>
+      </section>
+
+      <div data-include="partials/footer.html"></div>
+    </main>
+    <script src="scripts/include.js"></script>
+    <script src="vendor/katex/katex.min.js"></script>
+    <script src="vendor/katex/contrib/auto-render.min.js"></script>
+    <script>
+      (function () {
+        if (window.renderMathInElement) {
+          window.renderMathInElement(document.body, {
+            delimiters: [
+              { left: '$$', right: '$$', display: true },
+              { left: '$', right: '$', display: false }
+            ],
+            throwOnError: false
+          });
+        }
+      })();
+    </script>
+  </body>
+  </html>
