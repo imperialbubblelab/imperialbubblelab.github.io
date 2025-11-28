@@ -1,0 +1,3623 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Loop Gym - ME1 Computing</title>
+    <script src="https://cdn.jsdelivr.net/pyodide/v0.24.1/full/pyodide.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/js-yaml@4.1.0/dist/js-yaml.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            background: #fff;
+            color: #000;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container { max-width: 1200px; margin: 0 auto; }
+        h1 { text-align: center; font-size: 2.5em; margin-bottom: 5px; }
+        .subtitle { text-align: center; color: #666; margin-bottom: 20px; font-size: 0.95em; }
+
+        /* Navigation */
+        .nav-bar {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            justify-content: center;
+            border-bottom: 1px solid #ddd;
+            padding-bottom: 15px;
+        }
+        .nav-btn {
+            padding: 8px 16px;
+            background: #fff;
+            border: 1px solid #000;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.9em;
+            transition: all 0.2s;
+        }
+        .nav-btn:hover { background: #f5f5f5; }
+        .nav-btn.active { background: #000; color: #fff; }
+        .nav-btn.goldilocks-btn { background: #fff3e0; border-color: #ff9800; }
+        .nav-btn.goldilocks-btn:hover { background: #ffe0b2; }
+        .nav-btn.goldilocks-btn.active { background: #ffb74d; color: #000; border-color: #f57c00; }
+
+        /* Progress Row - bar + stats side by side */
+        .progress-row {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        .progress-container {
+            flex: 1;
+            background: #f0f0f0;
+            border-radius: 15px;
+            height: 32px;
+            overflow: hidden;
+            border: 1px solid #ddd;
+        }
+        .progress-bar {
+            height: 100%;
+            background: #000;
+            transition: width 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+            font-size: 1em;
+            font-weight: bold;
+        }
+
+        /* Stats */
+        .stats {
+            display: flex;
+            gap: 20px;
+            font-size: 0.85em;
+            flex-shrink: 0;
+        }
+        .stat { text-align: center; }
+        .stat-value { font-size: 1.2em; font-weight: bold; }
+
+        /* Exercise Area */
+        .exercise-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        @media (max-width: 800px) {
+            .exercise-container { grid-template-columns: 1fr; }
+            body { padding: 10px; }
+            h1 { font-size: 1.8em; }
+            .nav-bar { gap: 6px; }
+            .nav-btn { padding: 6px 10px; font-size: 0.8em; }
+            .progress-row { flex-direction: column; gap: 10px; }
+            .stats { justify-content: center; gap: 15px; }
+            .btn { padding: 12px 16px; min-height: 44px; } /* touch-friendly */
+            .answer-input { font-size: 16px; min-height: 44px; } /* prevents zoom on iOS */
+            /* Show workspace on mobile with stacked layout */
+            .workspace-panel {
+                display: block;
+                order: 2;
+            }
+            .exercise-panel {
+                order: 1;
+            }
+            .workspace-panel textarea.code-input {
+                min-height: 120px;
+                font-size: 16px; /* prevents zoom on iOS */
+            }
+            .workspace-panel .output-panel {
+                min-height: 80px;
+                max-height: 150px;
+            }
+            .workspace-tabs {
+                flex-wrap: wrap;
+            }
+            .workspace-tab {
+                min-height: 44px; /* touch-friendly */
+                display: flex;
+                align-items: center;
+            }
+        }
+        @media (max-width: 500px) {
+            .nav-bar { display: none; }
+            .mobile-nav { display: block; }
+            pre.code-block { font-size: 0.75em; padding: 10px; }
+            .workspace-panel textarea.code-input {
+                min-height: 100px;
+                font-size: 16px;
+            }
+            .workspace-panel .output-panel {
+                max-height: 120px;
+            }
+        }
+
+        .panel {
+            background: #fff;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 15px;
+        }
+        .panel h3 {
+            font-size: 1em;
+            margin-bottom: 10px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .exercise-num {
+            display: inline-block;
+            background: #000;
+            color: #fff;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.85em;
+            margin-right: 10px;
+        }
+        .category-tag {
+            display: inline-block;
+            background: #fff;
+            border: 1px solid #999;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.75em;
+        }
+
+        .question {
+            font-size: 1em;
+            line-height: 1.6;
+            margin-bottom: 15px;
+        }
+        .question code {
+            background: #f5f5f5;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Consolas', monospace;
+            border: 1px solid #ddd;
+        }
+
+        pre.code-block {
+            background: #f8f8f8;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 12px;
+            font-family: 'Consolas', monospace;
+            font-size: 0.9em;
+            overflow-x: auto;
+            margin-bottom: 15px;
+            line-height: 1.4;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        /* Mobile navigation dropdown */
+        .mobile-nav {
+            display: none;
+            margin-bottom: 15px;
+        }
+        .mobile-nav select {
+            width: 100%;
+            padding: 12px;
+            font-size: 16px;
+            border: 1px solid #000;
+            border-radius: 4px;
+            background: #fff;
+            min-height: 44px;
+        }
+
+        .answer-section {
+            margin-top: 15px;
+        }
+        .answer-section label {
+            display: block;
+            font-weight: 500;
+            margin-bottom: 5px;
+        }
+        .answer-input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-family: 'Consolas', monospace;
+            font-size: 1em;
+        }
+        .answer-input:focus {
+            outline: none;
+            border-color: #000;
+        }
+        .answer-input.correct {
+            border-color: #4caf50;
+            background: #f1f8e9;
+        }
+        .answer-input.incorrect {
+            border-color: #f44336;
+            background: #ffebee;
+        }
+
+        textarea.code-input {
+            width: 100%;
+            min-height: 120px;
+            padding: 12px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-family: 'Consolas', monospace;
+            font-size: 0.9em;
+            resize: vertical;
+            line-height: 1.4;
+        }
+        textarea.code-input:focus {
+            outline: none;
+            border-color: #000;
+        }
+
+        .btn-row {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+        .btn {
+            padding: 10px 20px;
+            border: 1px solid #000;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.9em;
+            transition: all 0.2s;
+        }
+        .btn-primary { background: #000; color: #fff; }
+        .btn-primary:hover { background: #333; }
+        .btn-secondary { background: #fff; color: #000; }
+        .btn-secondary:hover { background: #f5f5f5; }
+
+        .output-panel {
+            background: #f8f8f8;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 12px;
+            font-family: 'Consolas', monospace;
+            font-size: 0.85em;
+            min-height: 80px;
+            max-height: 200px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+        }
+        .output-panel.error { color: #c00; }
+
+        .feedback {
+            margin-top: 15px;
+            padding: 12px;
+            border-radius: 4px;
+            display: none;
+        }
+        .feedback.correct {
+            display: block;
+            background: #f1f8e9;
+            border: 1px solid #4caf50;
+            color: #2e7d32;
+        }
+        .feedback.incorrect {
+            display: block;
+            background: #ffebee;
+            border: 1px solid #f44336;
+            color: #c62828;
+        }
+
+        .hint-box {
+            background: #fff8e1;
+            border: 1px solid #ffc107;
+            border-radius: 4px;
+            padding: 12px;
+            margin-top: 10px;
+            display: none;
+            font-size: 0.9em;
+        }
+        .hint-box.visible { display: block; }
+
+        /* Exercise List Sidebar */
+        .exercise-list {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 300px;
+            height: 100vh;
+            background: #fff;
+            border-right: 1px solid #ddd;
+            overflow-y: auto;
+            padding: 20px;
+            z-index: 100;
+        }
+        .exercise-list.visible { display: block; }
+        .exercise-list h3 { margin-bottom: 15px; }
+        .exercise-list-item {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin-bottom: 5px;
+            cursor: pointer;
+            font-size: 0.85em;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .exercise-list-item:hover { background: #f5f5f5; }
+        .exercise-list-item.completed { background: #f1f8e9; border-color: #4caf50; }
+        .exercise-list-item.current { background: #e3f2fd; border-color: #2196f3; }
+        .close-list {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: none;
+            border: none;
+            font-size: 1.5em;
+            cursor: pointer;
+        }
+
+        .overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.3);
+            z-index: 99;
+        }
+        .overlay.visible { display: block; }
+
+        /* Loading */
+        .loading {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #fff;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        .loading.hidden { display: none; }
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid #eee;
+            border-top: 3px solid #000;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 15px;
+        }
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+
+        /* Navigation arrows */
+        .nav-arrows {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 20px;
+        }
+        .nav-arrow {
+            padding: 10px 20px;
+            background: #fff;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.9em;
+        }
+        .nav-arrow:hover { background: #f5f5f5; border-color: #000; }
+        .nav-arrow:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        /* Difficulty badges */
+        .difficulty-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 0.7em;
+            font-weight: bold;
+            text-transform: uppercase;
+            margin-left: 8px;
+            vertical-align: middle;
+        }
+        .difficulty-easy { background: #4caf50; color: white; }
+        .difficulty-intermediate { background: #ff9800; color: white; }
+        .difficulty-advanced { background: #f44336; color: white; }
+        .difficulty-insane { background: #9c27b0; color: white; }
+
+        /* Exercise type badges */
+        .type-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.7em;
+            margin-left: 8px;
+            border: 1px solid currentColor;
+            vertical-align: middle;
+        }
+        .type-tracing { color: #2196f3; background: rgba(33, 150, 243, 0.1); }
+        .type-writing { color: #9c27b0; background: rgba(156, 39, 176, 0.1); }
+        .type-debugging { color: #ff5722; background: rgba(255, 87, 34, 0.1); }
+
+        /* Test case results */
+        .test-results {
+            margin-top: 10px;
+        }
+        .test-case {
+            padding: 8px 12px;
+            margin: 5px 0;
+            border-radius: 4px;
+            font-family: 'Consolas', monospace;
+            font-size: 0.85em;
+        }
+        .test-case.passed {
+            background: #f1f8e9;
+            border-left: 3px solid #4caf50;
+        }
+        .test-case.failed {
+            background: #ffebee;
+            border-left: 3px solid #f44336;
+        }
+        .test-case .test-label {
+            font-weight: bold;
+            margin-bottom: 4px;
+        }
+        .test-case .test-expected, .test-case .test-actual {
+            font-size: 0.9em;
+            color: #666;
+        }
+
+        /* Statistics panel */
+        .stats-panel {
+            background: #f9f9f9;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 15px;
+        }
+        .stats-panel h4 {
+            margin: 0 0 12px 0;
+            font-size: 0.95em;
+            border-bottom: 1px solid #ddd;
+            padding-bottom: 8px;
+        }
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 5px 0;
+            font-size: 0.85em;
+        }
+        .stat-row span:last-child {
+            font-weight: bold;
+        }
+        .timer-not-started {
+            color: #999;
+            font-style: italic;
+            font-weight: normal !important;
+        }
+        .hard-questions {
+            margin-top: 12px;
+            padding-top: 10px;
+            border-top: 1px solid #eee;
+        }
+        .hard-questions h5 {
+            font-size: 0.8em;
+            color: #666;
+            margin-bottom: 8px;
+        }
+        .hard-questions ul {
+            list-style: none;
+            font-size: 0.8em;
+        }
+        .hard-questions li {
+            padding: 3px 0;
+            color: #f44336;
+        }
+
+        /* File buttons */
+        .file-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+            flex-wrap: wrap;
+        }
+        .btn-save { background: #2196f3; color: white; border-color: #2196f3; }
+        .btn-save:hover { background: #1976d2; }
+        .btn-load { background: #607d8b; color: white; border-color: #607d8b; }
+        .btn-load:hover { background: #455a64; }
+        .btn-reset { background: #f44336; color: white; border-color: #f44336; }
+        .btn-reset:hover { background: #d32f2f; }
+
+        /* Code with line numbers for debugging */
+        .code-with-lines {
+            background: #f8f8f8;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 0;
+            font-family: 'Consolas', monospace;
+            font-size: 0.9em;
+            overflow-x: auto;
+            margin-bottom: 15px;
+        }
+        .code-line {
+            display: flex;
+            line-height: 1.6;
+        }
+        .code-line:hover {
+            background: #f0f0f0;
+        }
+        .line-num {
+            color: #999;
+            padding: 0 12px;
+            text-align: right;
+            min-width: 40px;
+            background: #f0f0f0;
+            border-right: 1px solid #ddd;
+            user-select: none;
+        }
+        .line-content {
+            padding: 0 12px;
+            white-space: pre;
+            flex: 1;
+        }
+
+        /* Bug description box */
+        .bug-info {
+            background: #fff3e0;
+            border: 1px solid #ff9800;
+            border-radius: 4px;
+            padding: 10px;
+            margin-bottom: 15px;
+            font-size: 0.9em;
+        }
+        .bug-info strong {
+            color: #e65100;
+        }
+
+        /* Starter code area */
+        .starter-code-label {
+            font-size: 0.85em;
+            color: #666;
+            margin-bottom: 5px;
+        }
+
+        /* Attempts indicator in exercise list */
+        .exercise-list-item .attempts-badge {
+            background: #ffebee;
+            color: #f44336;
+            padding: 1px 6px;
+            border-radius: 10px;
+            font-size: 0.75em;
+            margin-left: 5px;
+        }
+
+        /* Workspace tabs */
+        .workspace-tabs {
+            display: flex;
+            border-bottom: 1px solid #ddd;
+            margin-bottom: 15px;
+        }
+        .workspace-tab {
+            padding: 8px 16px;
+            background: #f5f5f5;
+            border: 1px solid #ddd;
+            border-bottom: none;
+            cursor: pointer;
+            font-size: 0.85em;
+            margin-right: 2px;
+            border-radius: 4px 4px 0 0;
+            transition: all 0.2s;
+        }
+        .workspace-tab:hover {
+            background: #e8e8e8;
+        }
+        .workspace-tab.active {
+            background: #fff;
+            border-bottom: 1px solid #fff;
+            margin-bottom: -1px;
+            font-weight: 500;
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+
+        /* Larger workspace when stats are in separate tab */
+        .workspace-panel textarea.code-input {
+            min-height: 250px;
+        }
+        .workspace-panel .output-panel {
+            min-height: 150px;
+            max-height: 400px;
+        }
+
+        /* Timer not started indicator */
+        .timer-not-started {
+            color: #999;
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+    <div class="loading" id="loading">
+        <div class="spinner"></div>
+        <p>Loading Python environment...</p>
+    </div>
+
+    <div class="container">
+        <h1>LOOP GYM</h1>
+
+        <div class="progress-row">
+            <div class="progress-container">
+                <div class="progress-bar" id="progressBar" style="width: 0%">0%</div>
+            </div>
+            <div class="stats">
+                <div class="stat">
+                    <div class="stat-value" id="completedCount">0</div>
+                    <div>Completed</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value" id="currentNum">1</div>
+                    <div>Current</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value" id="totalCount">100</div>
+                    <div>Total</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="mobile-nav">
+            <select onchange="if(this.value==='goldilocks'){filterGoldilocks()}else{filterCategory(this.value)}">
+                <option value="all">All Exercises</option>
+                <option value="goldilocks">Goldilocks (15 exercises)</option>
+                <option value="while-basics">While Basics (1-15)</option>
+                <option value="while-trace">While Tracing (16-30)</option>
+                <option value="for-range">For &amp; Range (31-50)</option>
+                <option value="for-lists">For &amp; Lists (51-65)</option>
+                <option value="nested">Nested Loops (66-80)</option>
+                <option value="conditionals">Conditionals (81-90)</option>
+                <option value="combined">Combined (91-100)</option>
+            </select>
+        </div>
+
+        <div class="nav-bar">
+            <button class="nav-btn active" onclick="filterCategory('all')">All</button>
+            <button class="nav-btn goldilocks-btn" onclick="filterGoldilocks()">Goldilocks (15)</button>
+            <button class="nav-btn" onclick="filterCategory('while-basics')">While Basics</button>
+            <button class="nav-btn" onclick="filterCategory('while-trace')">While Tracing</button>
+            <button class="nav-btn" onclick="filterCategory('for-range')">For &amp; Range</button>
+            <button class="nav-btn" onclick="filterCategory('for-lists')">For &amp; Lists</button>
+            <button class="nav-btn" onclick="filterCategory('nested')">Nested Loops</button>
+            <button class="nav-btn" onclick="filterCategory('conditionals')">Conditionals</button>
+            <button class="nav-btn" onclick="filterCategory('functions')">Functions</button>
+            <button class="nav-btn" onclick="toggleExerciseList()">Exercise List</button>
+        </div>
+
+        <div class="exercise-container">
+            <div class="panel">
+                <h3>
+                    <span>
+                        <span class="exercise-num" id="exNum">#1</span>
+                        <span id="exCategory" class="category-tag">while-basics</span>
+                        <span class="difficulty-badge difficulty-easy" id="exDifficulty">Easy</span>
+                        <span class="type-badge type-tracing" id="exType">Tracing</span>
+                    </span>
+                </h3>
+                <div class="question" id="exQuestion"></div>
+                <pre class="code-block" id="exCode"></pre>
+                <div class="answer-section" id="answerSection"></div>
+                <div class="btn-row">
+                    <button class="btn btn-primary" id="checkBtn" onclick="checkAnswer()">Check Answer</button>
+                    <button class="btn btn-secondary" onclick="toggleHint()">Hint</button>
+                </div>
+                <div class="hint-box" id="hintBox"></div>
+                <div class="feedback" id="feedback"></div>
+            </div>
+
+            <div class="panel workspace-panel">
+                <div class="workspace-tabs">
+                    <div class="workspace-tab active" onclick="switchTab('workspace')">Workspace</div>
+                    <div class="workspace-tab" onclick="switchTab('stats')">Statistics</div>
+                </div>
+
+                <div id="workspaceTab" class="tab-content active">
+                    <textarea class="code-input" id="workspace" placeholder="Use this space to test code...&#10"></textarea>
+                    <div class="btn-row">
+                        <button class="btn btn-primary" onclick="runWorkspace()">Run Code</button>
+                        <button class="btn btn-secondary" onclick="clearWorkspace()">Clear</button>
+                    </div>
+                    <div style="margin-top: 15px;">
+                        <label style="font-weight: 500; margin-bottom: 5px; display: block;">Output:</label>
+                        <div class="output-panel" id="output">Click "Run Code" to execute...</div>
+                    </div>
+                </div>
+
+                <div id="statsTab" class="tab-content">
+                    <div class="stats-panel" id="statsPanel" style="margin-top: 0;">
+                        <h4>Session Statistics</h4>
+                        <div class="stat-row">
+                            <span>Total Time:</span>
+                            <span id="statTotalTime" class="timer-not-started">Click workspace to start</span>
+                        </div>
+                        <div class="stat-row">
+                            <span>Exercises Completed:</span>
+                            <span id="statCompleted">0 / 100</span>
+                        </div>
+                        <div class="stat-row">
+                            <span>Average Attempts:</span>
+                            <span id="statAvgAttempts">-</span>
+                        </div>
+                        <div class="hard-questions" id="hardQuestions">
+                            <h5>Questions Requiring Multiple Attempts:</h5>
+                            <ul id="hardQuestionsList">
+                                <li style="color: #999;">None yet</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="file-buttons">
+                        <button class="btn btn-save" onclick="exportProgress()">Save Progress</button>
+                        <button class="btn btn-load" onclick="importProgress()">Load Progress</button>
+                        <button class="btn btn-reset" onclick="resetProgress()">Reset All</button>
+                        <input type="file" id="yamlFileInput" accept=".yaml,.yml" style="display: none" onchange="handleYamlUpload(event)">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="nav-arrows">
+            <button class="nav-arrow" id="prevBtn" onclick="prevExercise()">&larr; Previous</button>
+            <button class="nav-arrow" id="nextBtn" onclick="nextExercise()">Next &rarr;</button>
+        </div>
+    </div>
+
+    <div class="overlay" id="overlay" onclick="toggleExerciseList()"></div>
+    <div class="exercise-list" id="exerciseList">
+        <button class="close-list" onclick="toggleExerciseList()">&times;</button>
+        <h3>All Exercises</h3>
+        <div id="exerciseListItems"></div>
+    </div>
+
+    <script>
+// ===========================================
+// EXERCISE DATA - 100 EXERCISES
+// ===========================================
+const exercises = [
+    // ========== WHILE BASICS (1-15) ==========
+    // 9 easy, 5 intermediate, 1 advanced
+    // Types: 8 writing, 5 tracing, 2 debugging
+
+    // EASY - Writing
+    {
+        id: 1,
+        name: "Count Up",
+        category: "while-basics",
+        difficulty: "easy",
+        exerciseType: "writing",
+        question: "Write a while loop that prints the numbers 1 through 5, each on a new line.",
+        starterCode: `# Print numbers 1 to 5
+`,
+        testCases: [
+            { input: "Output", expected: "1\n2\n3\n4\n5" }
+        ],
+        hint: "Start with n = 1, loop while n <= 5, print n, then increment n",
+        solution: `n = 1
+while n <= 5:
+    print(n)
+    n = n + 1`
+    },
+    {
+        id: 2,
+        name: "Countdown",
+        category: "while-basics",
+        difficulty: "easy",
+        exerciseType: "writing",
+        question: "Write a while loop that counts down from 5 to 1, printing each number.",
+        starterCode: `# Count down from 5 to 1
+`,
+        testCases: [
+            { input: "Output", expected: "5\n4\n3\n2\n1" }
+        ],
+        hint: "Start with n = 5, loop while n >= 1, print n, then decrement n",
+        solution: `n = 5
+while n >= 1:
+    print(n)
+    n = n - 1`
+    },
+    {
+        id: 3,
+        name: "Exit Value",
+        category: "while-basics",
+        difficulty: "easy",
+        exerciseType: "tracing",
+        question: "What value will <code>x</code> have after this loop finishes?",
+        code: `x = 0
+while x < 5:
+    x = x + 1`,
+        answer: "5",
+        hint: "The loop adds 1 to x each iteration. When does x < 5 become False?",
+        solution: "x starts at 0 and increments: 0→1→2→3→4→5. When x=5, the condition x<5 is False, so the loop exits with x=5."
+    },
+    {
+        id: 4,
+        name: "Loop Count",
+        category: "while-basics",
+        difficulty: "easy",
+        exerciseType: "tracing",
+        question: "How many times does this loop execute its body?",
+        code: `count = 0
+n = 10
+while n > 0:
+    count = count + 1
+    n = n - 2`,
+        answer: "5",
+        hint: "n decreases by 2 each time: 10, 8, 6, 4, 2, 0...",
+        solution: "n: 10→8→6→4→2→0. The loop runs 5 times (when n is 10, 8, 6, 4, 2). At n=0, condition fails."
+    },
+    // EASY - Writing continued
+    {
+        id: 5,
+        name: "Sum 1-5",
+        category: "while-basics",
+        difficulty: "easy",
+        exerciseType: "writing",
+        question: "Write a while loop that calculates the sum of numbers from 1 to 5. Print the final sum.",
+        starterCode: `# Calculate sum of 1 to 5
+total = 0
+`,
+        testCases: [
+            { input: "Output", expected: "15" }
+        ],
+        hint: "Use a counter variable and add it to total in each iteration",
+        solution: `total = 0
+n = 1
+while n <= 5:
+    total = total + n
+    n = n + 1
+print(total)`
+    },
+    {
+        id: 6,
+        name: "Even Numbers",
+        category: "while-basics",
+        difficulty: "easy",
+        exerciseType: "writing",
+        question: "Write a while loop that prints even numbers from 2 to 10.",
+        starterCode: `# Print even numbers 2, 4, 6, 8, 10
+`,
+        testCases: [
+            { input: "Output", expected: "2\n4\n6\n8\n10" }
+        ],
+        hint: "Start at 2 and increment by 2 each time",
+        solution: `n = 2
+while n <= 10:
+    print(n)
+    n = n + 2`
+    },
+    {
+        id: 7,
+        name: "Running Total",
+        category: "while-basics",
+        difficulty: "easy",
+        exerciseType: "tracing",
+        question: "What is the final value of <code>total</code>?",
+        code: `total = 0
+i = 1
+while i <= 4:
+    total = total + i
+    i = i + 1`,
+        answer: "10",
+        hint: "This calculates 1 + 2 + 3 + 4",
+        solution: "total accumulates: 0+1=1, 1+2=3, 3+3=6, 6+4=10. Final total = 10."
+    },
+    {
+        id: 8,
+        name: "Off By One",
+        category: "while-basics",
+        difficulty: "easy",
+        exerciseType: "debugging",
+        debugType: "identify",
+        question: "This code should print numbers 1 to 5, but it has a bug. Which line contains the error?",
+        buggyCode: `n = 1
+while n < 5:
+    print(n)
+    n = n + 1`,
+        expectedBehavior: "Should print: 1, 2, 3, 4, 5",
+        actualBehavior: "Prints: 1, 2, 3, 4 (missing 5)",
+        answer: "2",
+        alternateAnswers: ["line 2", "while n < 5"],
+        hint: "Look at the condition - when is n=5 printed?",
+        solution: "Line 2: The condition n < 5 stops when n equals 5, so 5 is never printed. Should be n <= 5."
+    },
+    {
+        id: 9,
+        name: "Position Steps",
+        category: "while-basics",
+        difficulty: "easy",
+        exerciseType: "tracing",
+        question: "What values are printed by this position update loop?",
+        code: `pos = 0
+vel = 2
+dt = 1
+while pos < 10:
+    print(pos)
+    pos = pos + vel * dt`,
+        answer: "0\n2\n4\n6\n8",
+        alternateAnswers: ["0 2 4 6 8"],
+        hint: "pos increases by vel*dt = 2 each iteration. What values before pos reaches 10?",
+        solution: "pos starts at 0, increases by 2 each step: 0→2→4→6→8→10. Prints 0,2,4,6,8 (stops when pos=10)."
+    },
+    // INTERMEDIATE
+    {
+        id: 10,
+        name: "Approach Target",
+        category: "while-basics",
+        difficulty: "intermediate",
+        exerciseType: "tracing",
+        question: "What value does <code>x</code> have when the loop exits?",
+        code: `target = 10.0
+x = 0
+step = 2.5
+while abs(x - target) > 0.5:
+    x = x + step`,
+        answer: "10.0",
+        alternateAnswers: ["10"],
+        hint: "x increases by 2.5 each step. When is abs(x - 10) <= 0.5?",
+        solution: "x: 0→2.5→5.0→7.5→10.0. At x=10.0, abs(10-10)=0 which is not > 0.5, so loop exits. x = 10.0"
+    },
+    {
+        id: 11,
+        name: "Halving Count",
+        category: "while-basics",
+        difficulty: "intermediate",
+        exerciseType: "writing",
+        question: "Write a while loop that finds how many times you can divide 1000 by 2 before reaching 1 or less.",
+        starterCode: `# Count divisions by 2
+n = 1000
+count = 0
+`,
+        testCases: [
+            { input: "Output", expected: "10" }
+        ],
+        hint: "Use integer division // and count each division",
+        solution: `n = 1000
+count = 0
+while n > 1:
+    n = n // 2
+    count = count + 1
+print(count)`
+    },
+    {
+        id: 12,
+        name: "Fix Factorial",
+        category: "while-basics",
+        difficulty: "intermediate",
+        exerciseType: "debugging",
+        debugType: "fix",
+        question: "Fix the bug: This code should calculate the factorial of 5 (5! = 120), but it returns 0.",
+        buggyCode: `n = 5
+result = 0
+while n > 0:
+    result = result * n
+    n = n - 1
+print(result)`,
+        testCases: [
+            { input: "Output", expected: "120" }
+        ],
+        hint: "What happens when you multiply anything by 0?",
+        solution: `n = 5
+result = 1
+while n > 0:
+    result = result * n
+    n = n - 1
+print(result)`
+    },
+    {
+        id: 13,
+        name: "Infinite Loop",
+        category: "while-basics",
+        difficulty: "intermediate",
+        exerciseType: "tracing",
+        question: "How many iterations does this loop run?",
+        code: `n = 1
+while n != 8:
+    n = n + 2`,
+        answer: "infinite",
+        alternateAnswers: ["forever", "never stops", "inf"],
+        hint: "What values does n take? Will it ever equal 8?",
+        solution: "n: 1→3→5→7→9→11... n is always odd, so n != 8 is always True. Infinite loop!"
+    },
+    {
+        id: 14,
+        name: "Power of 3",
+        category: "while-basics",
+        difficulty: "intermediate",
+        exerciseType: "writing",
+        question: "Write a while loop that finds the smallest power of 3 greater than 100. Print that power.",
+        starterCode: `# Find smallest power of 3 > 100
+`,
+        testCases: [
+            { input: "Output", expected: "243" }
+        ],
+        hint: "Start at 1, multiply by 3 until > 100",
+        solution: `n = 1
+while n <= 100:
+    n = n * 3
+print(n)`
+    },
+    // ADVANCED
+    {
+        id: 15,
+        name: "GCD Algorithm",
+        category: "while-basics",
+        difficulty: "advanced",
+        exerciseType: "writing",
+        question: "Write a while loop that computes the greatest common divisor (GCD) of 48 and 18 using Euclid's algorithm.",
+        starterCode: `# GCD of 48 and 18 using Euclid's algorithm
+a = 48
+b = 18
+`,
+        testCases: [
+            { input: "Output", expected: "6" }
+        ],
+        hint: "Replace larger with remainder of larger/smaller until one is 0",
+        solution: `a = 48
+b = 18
+while b != 0:
+    temp = b
+    b = a % b
+    a = temp
+print(a)`
+    },
+
+    // ========== WHILE TRACING (16-30) ==========
+    // 9 easy, 5 intermediate, 1 advanced
+    // Types: mostly tracing with some writing/debugging
+
+    {
+        id: 16,
+        name: "Sum Down",
+        category: "while-trace",
+        difficulty: "easy",
+        exerciseType: "tracing",
+        question: "What is the final value of <code>s</code>?",
+        code: `s = 0
+k = 5
+while k > 0:
+    s = s + k
+    k = k - 1`,
+        answer: "15",
+        hint: "This calculates 5 + 4 + 3 + 2 + 1",
+        solution: "s = 5+4+3+2+1 = 15. This is the sum from k=5 down to k=1."
+    },
+    {
+        id: 17,
+        name: "Factorial Trace",
+        category: "while-trace",
+        difficulty: "easy",
+        exerciseType: "tracing",
+        question: "What does <code>result</code> equal after the loop?",
+        code: `result = 1
+n = 4
+while n > 0:
+    result = result * n
+    n = n - 1`,
+        answer: "24",
+        hint: "This computes 4 × 3 × 2 × 1 (factorial of 4)",
+        solution: "result = 1×4×3×2×1 = 24. This calculates 4! (4 factorial)."
+    },
+    {
+        id: 18,
+        name: "Step by 3",
+        category: "while-trace",
+        difficulty: "easy",
+        exerciseType: "tracing",
+        question: "What is the value of <code>x</code> when the loop finishes?",
+        code: `x = 10
+while x > 3:
+    x = x - 3`,
+        answer: "1",
+        hint: "x decreases by 3: 10, 7, 4, 1...",
+        solution: "x: 10→7→4→1. At x=1, condition x>3 is False. x = 1."
+    },
+    {
+        id: 19,
+        name: "Print Count",
+        category: "while-trace",
+        difficulty: "easy",
+        exerciseType: "tracing",
+        question: "How many times is 'Hi' printed?",
+        code: `i = 0
+while i < 3:
+    print('Hi')
+    i = i + 1`,
+        answer: "3",
+        hint: "i goes through values 0, 1, 2 before becoming 3",
+        solution: "Loop runs for i=0, i=1, i=2 (3 times). When i=3, condition fails."
+    },
+    {
+        id: 20,
+        name: "Two Sum Exists",
+        category: "while-trace",
+        difficulty: "advanced",
+        exerciseType: "writing",
+        question: "Write code that checks if any two numbers in [2, 7, 11, 15] add up to 9. Print True or False.",
+        starterCode: `nums = [2, 7, 11, 15]
+target = 9
+# Check if any two numbers sum to target
+`,
+        testCases: [
+            { input: "Output", expected: "True" }
+        ],
+        hint: "Use nested loops to check all pairs, or use a set to track complements",
+        solution: `nums = [2, 7, 11, 15]
+target = 9
+found = False
+for i in range(len(nums)):
+    for j in range(i + 1, len(nums)):
+        if nums[i] + nums[j] == target:
+            found = True
+print(found)`
+    },
+    {
+        id: 21,
+        name: "Reverse Integer",
+        category: "while-trace",
+        difficulty: "advanced",
+        exerciseType: "writing",
+        question: "Write code that reverses the digits of x = 123 using a while loop. Print the reversed number (321).",
+        starterCode: `x = 123
+# Reverse the digits
+`,
+        testCases: [
+            { input: "Output", expected: "321" }
+        ],
+        hint: "Use modulo (%) to get the last digit and integer division (//) to remove it",
+        solution: `x = 123
+reversed_num = 0
+while x > 0:
+    digit = x % 10
+    reversed_num = reversed_num * 10 + digit
+    x = x // 10
+print(reversed_num)`
+    },
+    {
+        id: 22,
+        name: "Sum Squares",
+        category: "while-trace",
+        difficulty: "easy",
+        exerciseType: "tracing",
+        question: "What does <code>y</code> equal after this code?",
+        code: `y = 0
+x = 1
+while x <= 5:
+    y = y + x * x
+    x = x + 1`,
+        answer: "55",
+        hint: "This sums squares: 1² + 2² + 3² + 4² + 5²",
+        solution: "y = 1 + 4 + 9 + 16 + 25 = 55 (sum of squares from 1 to 5)"
+    },
+    {
+        id: 23,
+        name: "Wrong Direction",
+        category: "while-trace",
+        difficulty: "easy",
+        exerciseType: "debugging",
+        debugType: "identify",
+        question: "This code should count down from 5 to 1, but it loops forever. Which line has the bug?",
+        buggyCode: `n = 5
+while n > 0:
+    print(n)
+    n = n + 1`,
+        expectedBehavior: "Should print 5, 4, 3, 2, 1 then stop",
+        actualBehavior: "Prints 5, 6, 7, 8... forever",
+        answer: "4",
+        alternateAnswers: ["line 4", "n = n + 1"],
+        hint: "To count down, should n increase or decrease?",
+        solution: "Line 4: Should be n = n - 1 to count down, not n = n + 1."
+    },
+    {
+        id: 24,
+        name: "Square Root",
+        category: "while-trace",
+        difficulty: "easy",
+        exerciseType: "tracing",
+        question: "What is the value of <code>n</code> when the loop stops?",
+        code: `n = 2
+while n * n < 50:
+    n = n + 1`,
+        answer: "8",
+        hint: "When is n² ≥ 50? Check: 7²=49, 8²=64",
+        solution: "n: 2,3,4,5,6,7 all satisfy n²<50. When n=8, 64<50 is False. n = 8."
+    },
+    // INTERMEDIATE
+    {
+        id: 25,
+        name: "Two Variables",
+        category: "while-trace",
+        difficulty: "intermediate",
+        exerciseType: "tracing",
+        question: "What is the final value of <code>a</code>?",
+        code: `a = 0
+b = 10
+while b > 0:
+    a = a + 1
+    b = b - a`,
+        answer: "4",
+        hint: "Track both a and b: a increases, b decreases by a each time",
+        solution: "a=1,b=9 → a=2,b=7 → a=3,b=4 → a=4,b=0. Loop exits with a=4."
+    },
+    {
+        id: 26,
+        name: "Float Steps",
+        category: "while-trace",
+        difficulty: "intermediate",
+        exerciseType: "tracing",
+        question: "How many times does this loop iterate?",
+        code: `x = 5
+count = 0
+while x > 0:
+    count = count + 1
+    x = x - 0.5`,
+        answer: "10",
+        hint: "x decreases by 0.5 each time: 5, 4.5, 4, 3.5..., 0.5, 0",
+        solution: "From 5 to 0 with step -0.5 takes 10 iterations."
+    },
+    {
+        id: 27,
+        name: "Double Plus One",
+        category: "while-trace",
+        difficulty: "intermediate",
+        exerciseType: "writing",
+        question: "Write code to simulate this: start with n=1, keep multiplying by 2 and adding 1, stop when n > 100. Print all values.",
+        starterCode: `# n = n * 2 + 1 pattern
+`,
+        testCases: [
+            { input: "Output", expected: "1\n3\n7\n15\n31\n63\n127" }
+        ],
+        hint: "While n <= 100, print n then do n = n * 2 + 1",
+        solution: `n = 1
+while n <= 100:
+    print(n)
+    n = n * 2 + 1
+print(n)`
+    },
+    {
+        id: 28,
+        name: "Sum Evens",
+        category: "while-trace",
+        difficulty: "intermediate",
+        exerciseType: "tracing",
+        question: "What is the value of <code>sum_val</code>?",
+        code: `sum_val = 0
+n = 1
+while n < 10:
+    if n % 2 == 0:
+        sum_val = sum_val + n
+    n = n + 1`,
+        answer: "20",
+        hint: "Only even numbers are added: 2 + 4 + 6 + 8",
+        solution: "Even n values < 10 are 2,4,6,8. sum_val = 2+4+6+8 = 20."
+    },
+    {
+        id: 29,
+        name: "Fix Fibonacci",
+        category: "while-trace",
+        difficulty: "intermediate",
+        exerciseType: "debugging",
+        debugType: "fix",
+        question: "Fix the bug: This should print the Fibonacci sequence up to 50, but has an error.",
+        buggyCode: `a = 0
+b = 1
+while a <= 50:
+    print(a)
+    a = b
+    b = a + b`,
+        testCases: [
+            { input: "Output", expected: "0\n1\n1\n2\n3\n5\n8\n13\n21\n34" }
+        ],
+        hint: "The values of a and b need to be updated correctly - consider using a temp variable",
+        solution: `a = 0
+b = 1
+while a <= 50:
+    print(a)
+    temp = a
+    a = b
+    b = temp + b`
+    },
+    // ADVANCED
+    {
+        id: 30,
+        name: "Int Square Root",
+        category: "while-trace",
+        difficulty: "advanced",
+        exerciseType: "tracing",
+        question: "What is the final value of <code>result</code>? (Hint: this implements integer square root)",
+        code: `n = 50
+result = 0
+while (result + 1) * (result + 1) <= n:
+    result = result + 1`,
+        answer: "7",
+        hint: "Find the largest integer whose square is ≤ 50",
+        solution: "7² = 49 ≤ 50 but 8² = 64 > 50. So result = 7 (integer square root of 50)."
+    },
+
+    // ========== FOR & RANGE (31-50) ==========
+    // 12 easy, 6 intermediate, 2 advanced
+
+    {
+        id: 31,
+        name: "Basic Range",
+        category: "for-range",
+        difficulty: "easy",
+        exerciseType: "writing",
+        question: "Write a for loop that prints numbers 0 to 4 using range().",
+        starterCode: `# Print 0 to 4
+`,
+        testCases: [
+            { input: "Output", expected: "0\n1\n2\n3\n4" }
+        ],
+        hint: "range(5) gives 0, 1, 2, 3, 4",
+        solution: `for i in range(5):
+    print(i)`
+    },
+    {
+        id: 32,
+        name: "Range Start",
+        category: "for-range",
+        difficulty: "easy",
+        exerciseType: "writing",
+        question: "Write a for loop that prints numbers 1 to 5 using range().",
+        starterCode: `# Print 1 to 5
+`,
+        testCases: [
+            { input: "Output", expected: "1\n2\n3\n4\n5" }
+        ],
+        hint: "range(1, 6) starts at 1 and stops before 6",
+        solution: `for i in range(1, 6):
+    print(i)`
+    },
+    {
+        id: 33,
+        name: "Range Sum",
+        category: "for-range",
+        difficulty: "easy",
+        exerciseType: "tracing",
+        question: "What is the sum of all values printed?",
+        code: `for i in range(4):
+    print(i)`,
+        answer: "6",
+        hint: "range(4) gives 0, 1, 2, 3",
+        solution: "0 + 1 + 2 + 3 = 6"
+    },
+    {
+        id: 34,
+        name: "Range Length",
+        category: "for-range",
+        difficulty: "easy",
+        exerciseType: "tracing",
+        question: "How many times does this loop execute?",
+        code: `for i in range(2, 8):
+    print(i)`,
+        answer: "6",
+        hint: "range(2, 8) includes 2, 3, 4, 5, 6, 7",
+        solution: "range(2, 8) gives 2, 3, 4, 5, 6, 7 - that's 6 values."
+    },
+    {
+        id: 35,
+        name: "Range Step",
+        category: "for-range",
+        difficulty: "easy",
+        exerciseType: "writing",
+        question: "Write a for loop that prints even numbers from 2 to 10 using range() with a step.",
+        starterCode: `# Print 2, 4, 6, 8, 10
+`,
+        testCases: [
+            { input: "Output", expected: "2\n4\n6\n8\n10" }
+        ],
+        hint: "range(start, stop, step) - use step=2",
+        solution: `for i in range(2, 11, 2):
+    print(i)`
+    },
+    {
+        id: 36,
+        name: "Reverse Range",
+        category: "for-range",
+        difficulty: "easy",
+        exerciseType: "writing",
+        question: "Write a for loop that counts down from 5 to 1 using range().",
+        starterCode: `# Count down: 5, 4, 3, 2, 1
+`,
+        testCases: [
+            { input: "Output", expected: "5\n4\n3\n2\n1" }
+        ],
+        hint: "Use a negative step: range(5, 0, -1)",
+        solution: `for i in range(5, 0, -1):
+    print(i)`
+    },
+    {
+        id: 37,
+        name: "Negative Step",
+        category: "for-range",
+        difficulty: "easy",
+        exerciseType: "tracing",
+        question: "What values does this loop print?",
+        code: `for i in range(10, 0, -3):
+    print(i)`,
+        answer: "10 7 4 1",
+        alternateAnswers: ["10, 7, 4, 1", "10\n7\n4\n1"],
+        hint: "Start at 10, decrease by 3 until reaching 0 or below",
+        solution: "10 → 7 → 4 → 1 → (would be -2, but that's < stop=0)"
+    },
+    {
+        id: 38,
+        name: "Sum 1-10",
+        category: "for-range",
+        difficulty: "easy",
+        exerciseType: "writing",
+        question: "Write a for loop that calculates the sum of 1 to 10. Print the result.",
+        starterCode: `# Sum 1 + 2 + ... + 10
+total = 0
+`,
+        testCases: [
+            { input: "Output", expected: "55" }
+        ],
+        hint: "Loop through range(1, 11) and add each value to total",
+        solution: `total = 0
+for i in range(1, 11):
+    total = total + i
+print(total)`
+    },
+    {
+        id: 39,
+        name: "Off By One",
+        category: "for-range",
+        difficulty: "easy",
+        exerciseType: "debugging",
+        debugType: "identify",
+        question: "This should print 1 to 10, but only prints 1 to 9. Which line has the bug?",
+        buggyCode: `for i in range(1, 10):
+    print(i)`,
+        expectedBehavior: "Should print 1, 2, 3, 4, 5, 6, 7, 8, 9, 10",
+        actualBehavior: "Prints 1, 2, 3, 4, 5, 6, 7, 8, 9 (missing 10)",
+        answer: "1",
+        alternateAnswers: ["line 1", "range(1, 10)"],
+        hint: "range() stops BEFORE the end value",
+        solution: "Line 1: range(1, 10) stops at 9. Should be range(1, 11) to include 10."
+    },
+    {
+        id: 40,
+        name: "Sum of Squares",
+        category: "for-range",
+        difficulty: "easy",
+        exerciseType: "tracing",
+        question: "What is the final value of <code>total</code>?",
+        code: `total = 0
+for i in range(1, 6):
+    total = total + i * i`,
+        answer: "55",
+        hint: "Sums squares: 1² + 2² + 3² + 4² + 5²",
+        solution: "total = 1 + 4 + 9 + 16 + 25 = 55"
+    },
+    {
+        id: 41,
+        name: "Multiples of 7",
+        category: "for-range",
+        difficulty: "easy",
+        exerciseType: "writing",
+        question: "Write a for loop that prints the first 5 multiples of 7.",
+        starterCode: `# Print: 7, 14, 21, 28, 35
+`,
+        testCases: [
+            { input: "Output", expected: "7\n14\n21\n28\n35" }
+        ],
+        hint: "Use range(1, 6) and multiply by 7, or range(7, 36, 7)",
+        solution: `for i in range(1, 6):
+    print(i * 7)`
+    },
+    {
+        id: 42,
+        name: "Step Count",
+        category: "for-range",
+        difficulty: "easy",
+        exerciseType: "tracing",
+        question: "How many iterations does this loop run?",
+        code: `for i in range(0, 20, 4):
+    print(i)`,
+        answer: "5",
+        hint: "0, 4, 8, 12, 16 (stops before 20)",
+        solution: "Values: 0, 4, 8, 12, 16. That's 5 iterations."
+    },
+    // INTERMEDIATE
+    {
+        id: 43,
+        name: "Factorial",
+        category: "for-range",
+        difficulty: "intermediate",
+        exerciseType: "writing",
+        question: "Write a for loop that calculates 5! (factorial of 5). Print the result.",
+        starterCode: `# Calculate 5! = 5 × 4 × 3 × 2 × 1
+result = 1
+`,
+        testCases: [
+            { input: "Output", expected: "120" }
+        ],
+        hint: "Loop from 1 to 5 and multiply each value with result",
+        solution: `result = 1
+for i in range(1, 6):
+    result = result * i
+print(result)`
+    },
+    {
+        id: 44,
+        name: "FizzBuzz Count",
+        category: "for-range",
+        difficulty: "intermediate",
+        exerciseType: "tracing",
+        question: "What is the final value of <code>count</code>?",
+        code: `count = 0
+for i in range(1, 20):
+    if i % 3 == 0 or i % 5 == 0:
+        count = count + 1`,
+        answer: "9",
+        hint: "Count numbers divisible by 3 or 5 in range 1-19",
+        solution: "Divisible by 3 or 5: 3,5,6,9,10,12,15,18 = 9 numbers (note: 15 counts once)"
+    },
+    {
+        id: 45,
+        name: "Divisible By 6",
+        category: "for-range",
+        difficulty: "intermediate",
+        exerciseType: "writing",
+        question: "Write a for loop that prints all numbers from 1 to 20 that are divisible by both 2 and 3.",
+        starterCode: `# Print numbers divisible by both 2 and 3
+`,
+        testCases: [
+            { input: "Output", expected: "6\n12\n18" }
+        ],
+        hint: "Divisible by both 2 and 3 means divisible by 6",
+        solution: `for i in range(1, 21):
+    if i % 2 == 0 and i % 3 == 0:
+        print(i)`
+    },
+    {
+        id: 46,
+        name: "Fix Power",
+        category: "for-range",
+        difficulty: "intermediate",
+        exerciseType: "debugging",
+        debugType: "fix",
+        question: "Fix the bug: This should calculate 2^10 (1024) using a loop, but gives wrong result.",
+        buggyCode: `result = 0
+for i in range(10):
+    result = result * 2
+print(result)`,
+        testCases: [
+            { input: "Output", expected: "1024" }
+        ],
+        hint: "What should result start as for multiplication?",
+        solution: `result = 1
+for i in range(10):
+    result = result * 2
+print(result)`
+    },
+    {
+        id: 47,
+        name: "Nested Sums",
+        category: "for-range",
+        difficulty: "intermediate",
+        exerciseType: "tracing",
+        question: "What values are printed by this nested loop?",
+        code: `for i in range(3):
+    for j in range(2):
+        print(i + j, end=' ')`,
+        answer: "0 1 1 2 2 3",
+        alternateAnswers: ["0 1 1 2 2 3 "],
+        hint: "i goes 0,1,2 and for each i, j goes 0,1",
+        solution: "i=0: 0+0=0, 0+1=1. i=1: 1+0=1, 1+1=2. i=2: 2+0=2, 2+1=3."
+    },
+    {
+        id: 48,
+        name: "Perfect Squares",
+        category: "for-range",
+        difficulty: "intermediate",
+        exerciseType: "writing",
+        question: "Write a for loop that finds and prints all perfect squares less than 50.",
+        starterCode: `# Print perfect squares < 50: 1, 4, 9, 16, 25, 36, 49
+`,
+        testCases: [
+            { input: "Output", expected: "1\n4\n9\n16\n25\n36\n49" }
+        ],
+        hint: "Loop through possible bases and check if square < 50",
+        solution: `for i in range(1, 8):
+    if i * i < 50:
+        print(i * i)`
+    },
+    // ADVANCED
+    {
+        id: 49,
+        name: "Prime Finder",
+        category: "for-range",
+        difficulty: "advanced",
+        exerciseType: "writing",
+        question: "Write code that prints all prime numbers between 2 and 30.",
+        starterCode: `# Print primes from 2 to 30
+`,
+        testCases: [
+            { input: "Output", expected: "2\n3\n5\n7\n11\n13\n17\n19\n23\n29" }
+        ],
+        hint: "For each number, check if any number from 2 to n-1 divides it evenly",
+        solution: `for n in range(2, 31):
+    is_prime = True
+    for d in range(2, n):
+        if n % d == 0:
+            is_prime = False
+            break
+    if is_prime:
+        print(n)`
+    },
+    {
+        id: 50,
+        name: "Triangle Count",
+        category: "for-range",
+        difficulty: "advanced",
+        exerciseType: "tracing",
+        question: "What is the final value of <code>total</code>?",
+        code: `total = 0
+for i in range(1, 5):
+    for j in range(i, 5):
+        total = total + 1`,
+        answer: "10",
+        hint: "Count iterations: when i=1, j goes 1-4 (4 times); when i=2, j goes 2-4 (3 times)...",
+        solution: "i=1: 4 iterations, i=2: 3 iterations, i=3: 2 iterations, i=4: 1 iteration. Total = 4+3+2+1 = 10."
+    },
+
+    // ========== FOR & LISTS (51-65) ==========
+    // 9 easy, 5 intermediate, 1 advanced
+
+    {
+        id: 51,
+        name: "Print List",
+        category: "for-lists",
+        difficulty: "easy",
+        exerciseType: "writing",
+        question: "Write a for loop that prints each item in the list [10, 20, 30, 40].",
+        starterCode: `nums = [10, 20, 30, 40]
+# Print each number
+`,
+        testCases: [
+            { input: "Output", expected: "10\n20\n30\n40" }
+        ],
+        hint: "Use 'for item in nums:'",
+        solution: `nums = [10, 20, 30, 40]
+for n in nums:
+    print(n)`
+    },
+    {
+        id: 52,
+        name: "List Sum",
+        category: "for-lists",
+        difficulty: "easy",
+        exerciseType: "tracing",
+        question: "What is the final value of <code>total</code>?",
+        code: `nums = [1, 2, 3, 4, 5]
+total = 0
+for n in nums:
+    total = total + n`,
+        answer: "15",
+        hint: "Sum all numbers in the list",
+        solution: "total = 1 + 2 + 3 + 4 + 5 = 15"
+    },
+    {
+        id: 53,
+        name: "Contains Duplicate",
+        category: "for-lists",
+        difficulty: "advanced",
+        exerciseType: "writing",
+        question: "Write code that checks if the list [1, 2, 3, 1] contains any duplicate values. Print True or False.",
+        starterCode: `nums = [1, 2, 3, 1]
+# Check for duplicates
+`,
+        testCases: [
+            { input: "Output", expected: "True" }
+        ],
+        hint: "Track seen numbers in a list or set, check if current number was already seen",
+        solution: `nums = [1, 2, 3, 1]
+seen = []
+has_duplicate = False
+for n in nums:
+    if n in seen:
+        has_duplicate = True
+    seen.append(n)
+print(has_duplicate)`
+    },
+    {
+        id: 54,
+        name: "List Length",
+        category: "for-lists",
+        difficulty: "easy",
+        exerciseType: "tracing",
+        question: "What is the final value of <code>count</code>?",
+        code: `words = ['cat', 'dog', 'bird', 'fish']
+count = 0
+for w in words:
+    count = count + 1`,
+        answer: "4",
+        hint: "Count how many items are in the list",
+        solution: "The loop runs once for each item. 4 items = count is 4."
+    },
+    {
+        id: 55,
+        name: "String Chars",
+        category: "for-lists",
+        difficulty: "easy",
+        exerciseType: "writing",
+        question: "Write a for loop that prints each character in the string 'hello'.",
+        starterCode: `word = 'hello'
+# Print each character
+`,
+        testCases: [
+            { input: "Output", expected: "h\ne\nl\nl\no" }
+        ],
+        hint: "You can loop through a string just like a list",
+        solution: `word = 'hello'
+for ch in word:
+    print(ch)`
+    },
+    {
+        id: 56,
+        name: "Find Max",
+        category: "for-lists",
+        difficulty: "easy",
+        exerciseType: "tracing",
+        question: "What is the value of <code>largest</code>?",
+        code: `nums = [3, 7, 2, 9, 4]
+largest = nums[0]
+for n in nums:
+    if n > largest:
+        largest = n`,
+        answer: "9",
+        hint: "This finds the maximum value in the list",
+        solution: "Starting with 3, we find 7 > 3, then 9 > 7. largest = 9."
+    },
+    {
+        id: 57,
+        name: "Find Largest",
+        category: "for-lists",
+        difficulty: "easy",
+        exerciseType: "writing",
+        question: "Write a for loop that finds the largest number in [12, 45, 7, 23, 56, 89, 34]. Print it.",
+        starterCode: `nums = [12, 45, 7, 23, 56, 89, 34]
+`,
+        testCases: [
+            { input: "Output", expected: "89" }
+        ],
+        hint: "Start with the first element as largest, then check each element",
+        solution: `nums = [12, 45, 7, 23, 56, 89, 34]
+largest = nums[0]
+for n in nums:
+    if n > largest:
+        largest = n
+print(largest)`
+    },
+    {
+        id: 58,
+        name: "Even Filter Bug",
+        category: "for-lists",
+        difficulty: "easy",
+        exerciseType: "debugging",
+        debugType: "identify",
+        question: "This should print all even numbers from the list, but has a bug. Which line?",
+        buggyCode: `nums = [1, 2, 3, 4, 5, 6]
+for n in nums:
+    if n % 2 == 1:
+        print(n)`,
+        expectedBehavior: "Should print: 2, 4, 6",
+        actualBehavior: "Prints: 1, 3, 5 (odd numbers instead)",
+        answer: "3",
+        alternateAnswers: ["line 3", "n % 2 == 1"],
+        hint: "What does n % 2 == 1 check for?",
+        solution: "Line 3: n % 2 == 1 checks for odd. Should be n % 2 == 0 for even."
+    },
+    {
+        id: 59,
+        name: "Index & Value",
+        category: "for-lists",
+        difficulty: "easy",
+        exerciseType: "tracing",
+        question: "What does this loop print when iterating with index and value?",
+        code: `items = ['a', 'b', 'c']
+for i in range(len(items)):
+    print(i, items[i])`,
+        answer: "0 a\n1 b\n2 c",
+        alternateAnswers: ["0 a 1 b 2 c"],
+        hint: "len(items) is 3, so i goes 0, 1, 2",
+        solution: "i=0: prints '0 a', i=1: prints '1 b', i=2: prints '2 c'"
+    },
+    // INTERMEDIATE
+    {
+        id: 60,
+        name: "Count Greater",
+        category: "for-lists",
+        difficulty: "intermediate",
+        exerciseType: "writing",
+        question: "Write a for loop that counts how many numbers in [4, 7, 2, 9, 1, 8, 5] are greater than 5. Print the count.",
+        starterCode: `nums = [4, 7, 2, 9, 1, 8, 5]
+count = 0
+`,
+        testCases: [
+            { input: "Output", expected: "3" }
+        ],
+        hint: "Check if each number > 5 and increment count if true",
+        solution: `nums = [4, 7, 2, 9, 1, 8, 5]
+count = 0
+for n in nums:
+    if n > 5:
+        count = count + 1
+print(count)`
+    },
+    {
+        id: 61,
+        name: "List Product",
+        category: "for-lists",
+        difficulty: "intermediate",
+        exerciseType: "tracing",
+        question: "What is the final value of <code>result</code>?",
+        code: `nums = [1, 2, 3, 4]
+result = 1
+for n in nums:
+    result = result * n`,
+        answer: "24",
+        hint: "This calculates the product of all numbers",
+        solution: "result = 1 × 2 × 3 × 4 = 24"
+    },
+    {
+        id: 62,
+        name: "Filter Positive",
+        category: "for-lists",
+        difficulty: "intermediate",
+        exerciseType: "writing",
+        question: "Write code that creates a new list containing only the positive numbers from [-3, 5, -1, 8, -2, 4]. Print the new list.",
+        starterCode: `nums = [-3, 5, -1, 8, -2, 4]
+positive = []
+`,
+        testCases: [
+            { input: "Output", expected: "[5, 8, 4]" }
+        ],
+        hint: "Use append() to add positive numbers to the new list",
+        solution: `nums = [-3, 5, -1, 8, -2, 4]
+positive = []
+for n in nums:
+    if n > 0:
+        positive.append(n)
+print(positive)`
+    },
+    {
+        id: 63,
+        name: "Fix Average",
+        category: "for-lists",
+        difficulty: "intermediate",
+        exerciseType: "debugging",
+        debugType: "fix",
+        question: "Fix the bug: This should calculate the average of the list, but gives wrong result.",
+        buggyCode: `nums = [10, 20, 30, 40]
+total = 0
+for n in nums:
+    total = total + n
+average = total / 10
+print(average)`,
+        testCases: [
+            { input: "Output", expected: "25.0" }
+        ],
+        hint: "What should you divide by to get the average?",
+        solution: `nums = [10, 20, 30, 40]
+total = 0
+for n in nums:
+    total = total + n
+average = total / len(nums)
+print(average)`
+    },
+    {
+        id: 64,
+        name: "Double In Place",
+        category: "for-lists",
+        difficulty: "intermediate",
+        exerciseType: "tracing",
+        question: "What is the final list after doubling each element in place?",
+        code: `nums = [1, 2, 3, 4, 5]
+for i in range(len(nums)):
+    nums[i] = nums[i] * 2
+print(nums)`,
+        answer: "[2, 4, 6, 8, 10]",
+        hint: "Each element is doubled in place",
+        solution: "Each element is multiplied by 2: [1*2, 2*2, 3*2, 4*2, 5*2] = [2, 4, 6, 8, 10]"
+    },
+    // ADVANCED
+    {
+        id: 65,
+        name: "Second Largest",
+        category: "for-lists",
+        difficulty: "advanced",
+        exerciseType: "writing",
+        question: "Write code that finds the second largest number in [23, 78, 45, 8, 32, 56]. Print it.",
+        starterCode: `nums = [23, 78, 45, 8, 32, 56]
+`,
+        testCases: [
+            { input: "Output", expected: "56" }
+        ],
+        hint: "Track both the largest and second largest as you iterate",
+        solution: `nums = [23, 78, 45, 8, 32, 56]
+largest = max(nums[0], nums[1])
+second = min(nums[0], nums[1])
+for n in nums[2:]:
+    if n > largest:
+        second = largest
+        largest = n
+    elif n > second:
+        second = n
+print(second)`
+    },
+
+    // ========== NESTED LOOPS (66-80) ==========
+    // 9 easy, 5 intermediate, 1 advanced
+
+    {
+        id: 66,
+        name: "Grid Count",
+        category: "nested",
+        difficulty: "easy",
+        exerciseType: "tracing",
+        question: "How many times is 'X' printed?",
+        code: `for i in range(3):
+    for j in range(4):
+        print('X')`,
+        answer: "12",
+        hint: "Outer loop runs 3 times, inner loop runs 4 times each",
+        solution: "3 × 4 = 12 times"
+    },
+    {
+        id: 67,
+        name: "Star Grid",
+        category: "nested",
+        difficulty: "easy",
+        exerciseType: "writing",
+        question: "Write nested loops to print a 3x3 grid of stars (*), with each row on a new line.",
+        starterCode: `# Print:
+# ***
+# ***
+# ***
+`,
+        testCases: [
+            { input: "Output", expected: "***\n***\n***" }
+        ],
+        hint: "Outer loop for rows, inner loop for columns, print newline after each row",
+        solution: `for i in range(3):
+    for j in range(3):
+        print('*', end='')
+    print()`
+    },
+    {
+        id: 68,
+        name: "Nested Total",
+        category: "nested",
+        difficulty: "easy",
+        exerciseType: "tracing",
+        question: "What is the value of <code>total</code>?",
+        code: `total = 0
+for i in range(2):
+    for j in range(3):
+        total = total + 1`,
+        answer: "6",
+        hint: "Count how many times the inner statement runs",
+        solution: "2 × 3 = 6 iterations of the inner loop"
+    },
+    {
+        id: 69,
+        name: "Number Triangle",
+        category: "nested",
+        difficulty: "easy",
+        exerciseType: "writing",
+        question: "Write nested loops to print this pattern:\n1\n12\n123",
+        starterCode: `# Print the number pattern
+`,
+        testCases: [
+            { input: "Output", expected: "1\n12\n123" }
+        ],
+        hint: "Outer loop controls rows (1-3), inner loop prints numbers 1 to row number",
+        solution: `for i in range(1, 4):
+    for j in range(1, i + 1):
+        print(j, end='')
+    print()`
+    },
+    {
+        id: 70,
+        name: "Pair Print",
+        category: "nested",
+        difficulty: "easy",
+        exerciseType: "tracing",
+        question: "What does this print?",
+        code: `for i in range(2):
+    for j in range(2):
+        print(i, j)`,
+        answer: "0 0\n0 1\n1 0\n1 1",
+        alternateAnswers: ["0 0 0 1 1 0 1 1"],
+        hint: "i goes 0,1 and for each i, j goes 0,1",
+        solution: "All combinations: (0,0), (0,1), (1,0), (1,1)"
+    },
+    {
+        id: 71,
+        name: "Star Triangle",
+        category: "nested",
+        difficulty: "easy",
+        exerciseType: "writing",
+        question: "Write nested loops to print a right triangle of stars:\n*\n**\n***\n****",
+        starterCode: `# Print triangle pattern
+`,
+        testCases: [
+            { input: "Output", expected: "*\n**\n***\n****" }
+        ],
+        hint: "Row i should have i stars",
+        solution: `for i in range(1, 5):
+    for j in range(i):
+        print('*', end='')
+    print()`
+    },
+    {
+        id: 72,
+        name: "Indent Bug",
+        category: "nested",
+        difficulty: "easy",
+        exerciseType: "debugging",
+        debugType: "identify",
+        question: "This should print a 2x2 grid but only prints 2 items. Which line has the bug?",
+        buggyCode: `for i in range(2):
+    for j in range(2):
+    print('*', end=' ')`,
+        expectedBehavior: "Should print: * * * *",
+        actualBehavior: "Prints: * *",
+        answer: "3",
+        alternateAnswers: ["line 3", "indentation"],
+        hint: "Check the indentation of the print statement",
+        solution: "Line 3: print is not indented inside the inner loop. It should be indented."
+    },
+    {
+        id: 73,
+        name: "Product Sum",
+        category: "nested",
+        difficulty: "easy",
+        exerciseType: "tracing",
+        question: "What is the final value of <code>sum</code>?",
+        code: `sum = 0
+for i in range(1, 3):
+    for j in range(1, 3):
+        sum = sum + i * j`,
+        answer: "9",
+        hint: "Calculate i*j for all combinations of i and j",
+        solution: "i=1,j=1: 1, i=1,j=2: 2, i=2,j=1: 2, i=2,j=2: 4. sum = 1+2+2+4 = 9"
+    },
+    {
+        id: 74,
+        name: "Times Table",
+        category: "nested",
+        difficulty: "easy",
+        exerciseType: "writing",
+        question: "Write nested loops to print multiplication table for 2: 2x1=2, 2x2=4, ... 2x5=10",
+        starterCode: `# Print: 2x1=2, 2x2=4, 2x3=6, 2x4=8, 2x5=10
+`,
+        testCases: [
+            { input: "Output", expected: "2x1=2\n2x2=4\n2x3=6\n2x4=8\n2x5=10" }
+        ],
+        hint: "Loop j from 1 to 5 and print 2*j each time",
+        solution: `for j in range(1, 6):
+    print(f'2x{j}={2*j}')`
+    },
+    // INTERMEDIATE
+    {
+        id: 75,
+        name: "3x3 Table",
+        category: "nested",
+        difficulty: "intermediate",
+        exerciseType: "writing",
+        question: "Write nested loops to print a multiplication table from 1x1 to 3x3.",
+        starterCode: `# Print 3x3 multiplication table
+`,
+        testCases: [
+            { input: "Output", expected: "1 2 3\n2 4 6\n3 6 9" }
+        ],
+        hint: "Outer loop for rows (1-3), inner loop for columns (1-3), print i*j",
+        solution: `for i in range(1, 4):
+    for j in range(1, 4):
+        print(i * j, end=' ')
+    print()`
+    },
+    {
+        id: 76,
+        name: "Variable Inner",
+        category: "nested",
+        difficulty: "intermediate",
+        exerciseType: "tracing",
+        question: "What is the final value of <code>count</code>?",
+        code: `count = 0
+for i in range(4):
+    for j in range(i):
+        count = count + 1`,
+        answer: "6",
+        hint: "When i=0, inner loop runs 0 times; i=1, runs 1 time; etc.",
+        solution: "i=0: 0, i=1: 1, i=2: 2, i=3: 3. count = 0+1+2+3 = 6"
+    },
+    {
+        id: 77,
+        name: "Best Speed",
+        category: "nested",
+        difficulty: "intermediate",
+        exerciseType: "tracing",
+        question: "What value is printed? This code finds the speed that gives the maximum distance.",
+        code: `best = 0
+best_speed = 0
+for speed in [1, 2, 3, 4, 5]:
+    distance = speed * 2
+    if distance > best:
+        best = distance
+        best_speed = speed
+print(best_speed)`,
+        answer: "5",
+        hint: "Track which speed gives the largest distance. distance = speed * 2.",
+        solution: "Speeds give distances: 1→2, 2→4, 3→6, 4→8, 5→10. Speed 5 gives best distance 10, so best_speed=5."
+    },
+    {
+        id: 78,
+        name: "Border Square",
+        category: "nested",
+        difficulty: "intermediate",
+        exerciseType: "debugging",
+        debugType: "fix",
+        question: "Fix the bug: This should print a square border but prints a filled square.",
+        buggyCode: `for i in range(4):
+    for j in range(4):
+        print('*', end='')
+    print()`,
+        testCases: [
+            { input: "Output", expected: "****\n*  *\n*  *\n****" }
+        ],
+        hint: "Only print * on the edges (first/last row, first/last column)",
+        solution: `for i in range(4):
+    for j in range(4):
+        if i == 0 or i == 3 or j == 0 or j == 3:
+            print('*', end='')
+        else:
+            print(' ', end='')
+    print()`
+    },
+    {
+        id: 79,
+        name: "Upper Triangle",
+        category: "nested",
+        difficulty: "intermediate",
+        exerciseType: "tracing",
+        question: "How many times is the inner print executed?",
+        code: `for i in range(5):
+    for j in range(i, 5):
+        print('*')`,
+        answer: "15",
+        hint: "When i=0, j goes 0-4 (5 times); i=1, j goes 1-4 (4 times)...",
+        solution: "5 + 4 + 3 + 2 + 1 = 15"
+    },
+    // ADVANCED
+    {
+        id: 80,
+        name: "Pascal Triangle",
+        category: "nested",
+        difficulty: "advanced",
+        exerciseType: "writing",
+        question: "Write nested loops to print Pascal's triangle first 5 rows.",
+        starterCode: `# Print Pascal's triangle (5 rows)
+# 1
+# 1 1
+# 1 2 1
+# 1 3 3 1
+# 1 4 6 4 1
+`,
+        testCases: [
+            { input: "Output", expected: "1\n1 1\n1 2 1\n1 3 3 1\n1 4 6 4 1" }
+        ],
+        hint: "Each number is the sum of two numbers above it. Start/end each row with 1.",
+        solution: `row = [1]
+for i in range(5):
+    print(' '.join(map(str, row)))
+    new_row = [1]
+    for j in range(len(row) - 1):
+        new_row.append(row[j] + row[j + 1])
+    new_row.append(1)
+    row = new_row`
+    },
+
+    // ========== CONDITIONALS (81-90) ==========
+    // 6 easy, 3 intermediate, 1 advanced
+
+    {
+        id: 81,
+        name: "Count Evens",
+        category: "conditionals",
+        difficulty: "easy",
+        exerciseType: "tracing",
+        question: "What is the final value of <code>count</code>?",
+        code: `nums = [1, 2, 3, 4, 5, 6, 7, 8]
+count = 0
+for n in nums:
+    if n % 2 == 0:
+        count = count + 1`,
+        answer: "4",
+        hint: "Count even numbers in the list",
+        solution: "Even numbers: 2, 4, 6, 8. count = 4"
+    },
+    {
+        id: 82,
+        name: "Even or Odd",
+        category: "conditionals",
+        difficulty: "easy",
+        exerciseType: "writing",
+        question: "Write a loop that prints 'even' or 'odd' for each number from 1 to 5.",
+        starterCode: `# Print whether each number 1-5 is even or odd
+`,
+        testCases: [
+            { input: "Output", expected: "odd\neven\nodd\neven\nodd" }
+        ],
+        hint: "Use if/else with n % 2 == 0",
+        solution: `for n in range(1, 6):
+    if n % 2 == 0:
+        print('even')
+    else:
+        print('odd')`
+    },
+    {
+        id: 83,
+        name: "Sum Div 3",
+        category: "conditionals",
+        difficulty: "easy",
+        exerciseType: "tracing",
+        question: "What is the value of <code>result</code>?",
+        code: `result = 0
+for i in range(10):
+    if i % 3 == 0:
+        result = result + i`,
+        answer: "18",
+        hint: "Sum numbers divisible by 3: 0, 3, 6, 9",
+        solution: "0 + 3 + 6 + 9 = 18"
+    },
+    {
+        id: 84,
+        name: "First Div 7",
+        category: "conditionals",
+        difficulty: "easy",
+        exerciseType: "writing",
+        question: "Write a loop that uses break to find and print the first number divisible by 7 in range 1-50.",
+        starterCode: `# Find first number divisible by 7
+`,
+        testCases: [
+            { input: "Output", expected: "7" }
+        ],
+        hint: "Loop through range and break when you find a number divisible by 7",
+        solution: `for n in range(1, 51):
+    if n % 7 == 0:
+        print(n)
+        break`
+    },
+    {
+        id: 85,
+        name: "FizzBuzz Order",
+        category: "conditionals",
+        difficulty: "easy",
+        exerciseType: "debugging",
+        debugType: "identify",
+        question: "This should print FizzBuzz for 15, but prints Fizz. Which line has the bug?",
+        buggyCode: `n = 15
+if n % 3 == 0:
+    print('Fizz')
+elif n % 5 == 0:
+    print('Buzz')
+elif n % 3 == 0 and n % 5 == 0:
+    print('FizzBuzz')`,
+        expectedBehavior: "Should print: FizzBuzz",
+        actualBehavior: "Prints: Fizz",
+        answer: "2",
+        alternateAnswers: ["line 2", "order", "if n % 3 == 0"],
+        hint: "The order of conditions matters - which one matches first?",
+        solution: "Line 2: The n % 3 == 0 check comes first and matches 15. The FizzBuzz check should come first."
+    },
+    {
+        id: 86,
+        name: "Skip Five",
+        category: "conditionals",
+        difficulty: "easy",
+        exerciseType: "tracing",
+        question: "What numbers are printed?",
+        code: `for i in range(1, 10):
+    if i == 5:
+        continue
+    print(i)`,
+        answer: "1 2 3 4 6 7 8 9",
+        alternateAnswers: ["1\n2\n3\n4\n6\n7\n8\n9"],
+        hint: "continue skips the rest of the loop body for that iteration",
+        solution: "All numbers 1-9 except 5 (which is skipped by continue)"
+    },
+    // INTERMEDIATE
+    {
+        id: 87,
+        name: "FizzBuzz",
+        category: "conditionals",
+        difficulty: "intermediate",
+        exerciseType: "writing",
+        question: "Write FizzBuzz for 1-15: print 'Fizz' for multiples of 3, 'Buzz' for 5, 'FizzBuzz' for both, else the number.",
+        starterCode: `# FizzBuzz 1-15
+`,
+        testCases: [
+            { input: "Output", expected: "1\n2\nFizz\n4\nBuzz\nFizz\n7\n8\nFizz\nBuzz\n11\nFizz\n13\n14\nFizzBuzz" }
+        ],
+        hint: "Check divisible by both 3 AND 5 first, then check individually",
+        solution: `for n in range(1, 16):
+    if n % 3 == 0 and n % 5 == 0:
+        print('FizzBuzz')
+    elif n % 3 == 0:
+        print('Fizz')
+    elif n % 5 == 0:
+        print('Buzz')
+    else:
+        print(n)`
+    },
+    {
+        id: 88,
+        name: "Break Then Done",
+        category: "conditionals",
+        difficulty: "intermediate",
+        exerciseType: "tracing",
+        question: "What is printed when the loop encounters a break statement?",
+        code: `for i in range(1, 6):
+    if i == 3:
+        break
+    print(i)
+print('done')`,
+        answer: "1\n2\ndone",
+        alternateAnswers: ["1 2 done"],
+        hint: "break exits the loop entirely when i equals 3",
+        solution: "Prints 1, 2, then breaks when i=3, then prints 'done'"
+    },
+    {
+        id: 89,
+        name: "Find Greater 5",
+        category: "conditionals",
+        difficulty: "intermediate",
+        exerciseType: "writing",
+        question: "Write a loop that finds the first number in [4, 7, 2, 9, 1] greater than 5. Use break.",
+        starterCode: `nums = [4, 7, 2, 9, 1]
+`,
+        testCases: [
+            { input: "Output", expected: "7" }
+        ],
+        hint: "Loop through and break when you find a number > 5",
+        solution: `nums = [4, 7, 2, 9, 1]
+for n in nums:
+    if n > 5:
+        print(n)
+        break`
+    },
+    // ADVANCED
+    {
+        id: 90,
+        name: "Prime Check",
+        category: "conditionals",
+        difficulty: "advanced",
+        exerciseType: "writing",
+        question: "Write code that checks if a number is prime. Test with n=17.",
+        starterCode: `n = 17
+# Check if n is prime
+`,
+        testCases: [
+            { input: "Output", expected: "True" }
+        ],
+        hint: "A prime has no divisors other than 1 and itself",
+        solution: `n = 17
+is_prime = True
+if n < 2:
+    is_prime = False
+else:
+    for d in range(2, n):
+        if n % d == 0:
+            is_prime = False
+            break
+print(is_prime)`
+    },
+    // Additional exercises for Sheet 1 preparation
+    {
+        id: 91,
+        name: "Valid Palindrome",
+        category: "conditionals",
+        difficulty: "advanced",
+        exerciseType: "writing",
+        question: "Write code that checks if the string 'racecar' is a palindrome (reads the same forwards and backwards). Print True or False.",
+        starterCode: `s = 'racecar'
+# Check if s is a palindrome
+`,
+        testCases: [
+            { input: "Output", expected: "True" }
+        ],
+        hint: "Compare characters from the start and end, moving towards the middle",
+        solution: `s = 'racecar'
+is_palindrome = True
+left = 0
+right = len(s) - 1
+while left < right:
+    if s[left] != s[right]:
+        is_palindrome = False
+    left = left + 1
+    right = right - 1
+print(is_palindrome)`
+    },
+    {
+        id: 92,
+        name: "Best Distance",
+        category: "nested",
+        difficulty: "intermediate",
+        exerciseType: "tracing",
+        question: "What value is printed? This code searches for the best combination of speed and time.",
+        code: `best = 0
+for speed in [1, 2, 3]:
+    for time in [1, 2, 3]:
+        dist = speed * time
+        if dist > best:
+            best = dist
+print(best)`,
+        answer: "9",
+        hint: "Try all speed × time combinations. What's the maximum distance?",
+        solution: "Maximum is speed=3, time=3: dist = 3×3 = 9. best = 9"
+    },
+    {
+        id: 93,
+        name: "Longest Streak",
+        category: "for-lists",
+        difficulty: "advanced",
+        exerciseType: "writing",
+        question: "Write code that finds the longest consecutive sequence of increasing numbers in [1, 2, 5, 6, 7, 3, 4, 5, 6, 7, 8]. Print the length.",
+        starterCode: `nums = [1, 2, 5, 6, 7, 3, 4, 5, 6, 7, 8]
+`,
+        testCases: [
+            { input: "Output", expected: "6" }
+        ],
+        hint: "Track current streak length and max streak length. Reset streak when sequence breaks.",
+        solution: `nums = [1, 2, 5, 6, 7, 3, 4, 5, 6, 7, 8]
+max_len = 1
+current_len = 1
+for i in range(1, len(nums)):
+    if nums[i] > nums[i-1]:
+        current_len = current_len + 1
+    else:
+        if current_len > max_len:
+            max_len = current_len
+        current_len = 1
+if current_len > max_len:
+    max_len = current_len
+print(max_len)`
+    },
+    {
+        id: 94,
+        name: "2D Max",
+        category: "nested",
+        difficulty: "easy",
+        exerciseType: "tracing",
+        question: "What is the value of <code>max_val</code>?",
+        code: `data = [[1, 2], [3, 4], [5, 6]]
+max_val = 0
+for row in data:
+    for val in row:
+        if val > max_val:
+            max_val = val`,
+        answer: "6",
+        hint: "Find the maximum value in a 2D list",
+        solution: "Going through all values: 1, 2, 3, 4, 5, 6. Maximum is 6."
+    },
+    {
+        id: 95,
+        name: "Filter Short",
+        category: "for-lists",
+        difficulty: "easy",
+        exerciseType: "tracing",
+        question: "What does <code>result</code> contain?",
+        code: `words = ['cat', 'dog', 'elephant', 'rat']
+result = []
+for w in words:
+    if len(w) <= 3:
+        result.append(w)`,
+        answer: "['cat', 'dog', 'rat']",
+        alternateAnswers: ["cat, dog, rat"],
+        hint: "Filter words with 3 or fewer characters",
+        solution: "Words with len <= 3: cat (3), dog (3), rat (3). Not elephant (8)."
+    },
+    {
+        id: 96,
+        name: "Remove Dupes",
+        category: "for-lists",
+        difficulty: "intermediate",
+        exerciseType: "writing",
+        question: "Write code that removes duplicates from [1, 2, 2, 3, 3, 3, 4] while preserving order. Print the result.",
+        starterCode: `nums = [1, 2, 2, 3, 3, 3, 4]
+unique = []
+`,
+        testCases: [
+            { input: "Output", expected: "[1, 2, 3, 4]" }
+        ],
+        hint: "Only append if the number is not already in unique list",
+        solution: `nums = [1, 2, 2, 3, 3, 3, 4]
+unique = []
+for n in nums:
+    if n not in unique:
+        unique.append(n)
+print(unique)`
+    },
+
+    // ========== FUNCTIONS (97-100) ==========
+    // These exercises test function RETURN values, not print output
+    // Critical for Sheet 1 preparation
+
+    {
+        id: 97,
+        name: "Sum Function",
+        category: "functions",
+        difficulty: "easy",
+        exerciseType: "writing",
+        question: "Write a function <code>sum_list(nums)</code> that <strong>returns</strong> the sum of all numbers in a list. Do NOT print - use <code>return</code>.",
+        starterCode: `def sum_list(nums):
+    # Return the sum of all numbers in nums
+`,
+        testCases: [
+            { call: "sum_list([1, 2, 3])", expected: "6" },
+            { call: "sum_list([10, 20])", expected: "30" },
+            { call: "sum_list([])", expected: "0" }
+        ],
+        hint: "Use a loop to add each number to a total, then return the total",
+        solution: `def sum_list(nums):
+    total = 0
+    for n in nums:
+        total = total + n
+    return total`
+    },
+    {
+        id: 98,
+        name: "Count Greater",
+        category: "functions",
+        difficulty: "intermediate",
+        exerciseType: "writing",
+        question: "Write a function <code>count_greater(nums, threshold)</code> that <strong>returns</strong> how many numbers in the list are greater than the threshold.",
+        starterCode: `def count_greater(nums, threshold):
+    # Return count of numbers > threshold
+`,
+        testCases: [
+            { call: "count_greater([1, 5, 3, 7, 2], 3)", expected: "2" },
+            { call: "count_greater([10, 20, 30], 15)", expected: "2" },
+            { call: "count_greater([1, 2, 3], 10)", expected: "0" }
+        ],
+        hint: "Loop through nums, increment a counter when n > threshold, then return the counter",
+        solution: `def count_greater(nums, threshold):
+    count = 0
+    for n in nums:
+        if n > threshold:
+            count = count + 1
+    return count`
+    },
+    {
+        id: 99,
+        name: "Find Best",
+        category: "functions",
+        difficulty: "intermediate",
+        exerciseType: "writing",
+        question: "Write a function <code>find_best(speeds, time)</code> that <strong>returns</strong> the speed that gives the maximum distance (distance = speed × time).",
+        starterCode: `def find_best(speeds, time):
+    # Return the speed that gives maximum distance
+`,
+        testCases: [
+            { call: "find_best([1, 2, 3, 4, 5], 2)", expected: "5" },
+            { call: "find_best([10, 5, 8], 3)", expected: "10" },
+            { call: "find_best([7], 1)", expected: "7" }
+        ],
+        hint: "Track best_distance and best_speed. Return best_speed at the end.",
+        solution: `def find_best(speeds, time):
+    best_distance = 0
+    best_speed = 0
+    for speed in speeds:
+        distance = speed * time
+        if distance > best_distance:
+            best_distance = distance
+            best_speed = speed
+    return best_speed`
+    },
+    {
+        id: 100,
+        name: "Landing Position",
+        category: "functions",
+        difficulty: "advanced",
+        exerciseType: "writing",
+        question: "Write a function <code>landing_pos(v0, dt, limit)</code> that simulates position updates using <code>pos = pos + v0 * dt</code> until pos >= limit. <strong>Return</strong> the final position. (Note: Return a number, e.g., 6.0, not a string.)",
+        starterCode: `def landing_pos(v0, dt, limit):
+    # Return final position after pos >= limit
+`,
+        testCases: [
+            { call: "landing_pos(2, 1, 10)", expected: "10" },
+            { call: "landing_pos(3, 0.5, 6)", expected: "6.0" },
+            { call: "landing_pos(5, 2, 15)", expected: "20" }
+        ],
+        hint: "Use a while loop: while pos < limit, update pos = pos + v0 * dt. Return pos.",
+        solution: `def landing_pos(v0, dt, limit):
+    pos = 0
+    while pos < limit:
+        pos = pos + v0 * dt
+    return pos`
+    }
+];
+
+// ===========================================
+// GOLDILOCKS SET - Curated 15 exercises for Sheet 1 warm-up
+// Covers: while basics, tracing, for/range, lists, nested loops, conditionals, functions
+// ===========================================
+const goldilocksIds = [
+    1,   // While Basics: Count Up (writing, easy) - fundamental while loop
+    3,   // While Basics: Exit Value (tracing, easy) - understand loop termination
+    16,  // While Trace: Sum Down (tracing, easy) - trace accumulator pattern
+    31,  // For Range: Basic Range (writing, easy) - fundamental for/range
+    35,  // For Range: Range Step (writing, easy) - range with step
+    43,  // For Range: Factorial (writing, intermediate) - accumulator with multiplication
+    51,  // For Lists: Print List (writing, easy) - iterate over list
+    56,  // For Lists: Find Max (tracing, easy) - find maximum pattern
+    60,  // For Lists: Count Greater (writing, intermediate) - conditional counting
+    66,  // Nested: Grid Count (tracing, easy) - understand nested iteration count
+    69,  // Nested: Number Triangle (writing, easy) - variable inner loop
+    81,  // Conditionals: Count Evens (tracing, easy) - filter with modulo
+    87,  // Conditionals: FizzBuzz (writing, intermediate) - classic conditional logic
+    97,  // Functions: Sum Function (writing, easy) - return vs print
+    99   // Functions: Find Best (writing, intermediate) - return best from loop
+];
+
+// ===========================================
+// APPLICATION STATE
+// ===========================================
+let currentExercise = 0;
+let completed = new Set();
+let currentFilter = 'all';
+let goldilocksMode = false;  // Track if goldilocks filter is active
+let pyodide = null;
+let currentExerciseStartTime = null;
+let sessionStartTime = null;  // Will be set on first workspace interaction
+let sessionTimerInterval = null;
+let sessionTimerStarted = false;
+
+// Tab switching function
+function switchTab(tabName) {
+    // Remove active class from all tabs and content
+    document.querySelectorAll('.workspace-tab').forEach(tab => tab.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+
+    // Activate selected tab
+    if (tabName === 'workspace') {
+        document.querySelector('.workspace-tab:first-child').classList.add('active');
+        document.getElementById('workspaceTab').classList.add('active');
+    } else if (tabName === 'stats') {
+        document.querySelector('.workspace-tab:last-child').classList.add('active');
+        document.getElementById('statsTab').classList.add('active');
+    }
+}
+
+// Start session timer on first interaction
+function startSessionTimer() {
+    if (sessionTimerStarted) return;
+
+    sessionTimerStarted = true;
+    sessionStartTime = Date.now();
+
+    // Remove the "not started" style
+    const timerEl = document.getElementById('statTotalTime');
+    timerEl.classList.remove('timer-not-started');
+    timerEl.textContent = '0s';
+
+    // Start live timer update
+    sessionTimerInterval = setInterval(updateLiveTimer, 1000);
+}
+
+// Update live timer display
+function updateLiveTimer() {
+    if (!sessionStartTime) return;
+    const elapsed = Date.now() - sessionStartTime + sessionState.statistics.totalTimeSpent;
+    document.getElementById('statTotalTime').textContent = formatTime(elapsed);
+}
+
+// Setup workspace interaction listeners
+function setupWorkspaceListeners() {
+    const workspace = document.getElementById('workspace');
+    const output = document.getElementById('output');
+
+    if (workspace) {
+        workspace.addEventListener('click', startSessionTimer);
+        workspace.addEventListener('focus', startSessionTimer);
+    }
+    if (output) {
+        output.addEventListener('click', startSessionTimer);
+    }
+}
+
+// Session state for tracking attempts and time
+const sessionState = {
+    exercises: {}, // Keyed by exercise ID
+    statistics: {
+        totalCompleted: 0,
+        totalAttempts: 0,
+        totalTimeSpent: 0,
+        hardestExercises: []
+    }
+};
+
+// Initialize exercise state for an exercise
+function getExerciseState(exerciseId) {
+    if (!sessionState.exercises[exerciseId]) {
+        sessionState.exercises[exerciseId] = {
+            id: exerciseId,
+            attempts: 0,
+            isCompleted: false,
+            totalTimeSpent: 0,
+            firstAttemptTime: null,
+            completedTime: null
+        };
+    }
+    return sessionState.exercises[exerciseId];
+}
+
+// Generate UUID for session
+function generateUUID() {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+        const r = Math.random() * 16 | 0;
+        const v = c === 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+    });
+}
+
+// Format time for display
+function formatTime(ms) {
+    const seconds = Math.floor(ms / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const hours = Math.floor(minutes / 60);
+
+    if (hours > 0) return `${hours}h ${minutes % 60}m`;
+    if (minutes > 0) return `${minutes}m ${seconds % 60}s`;
+    return `${seconds}s`;
+}
+
+// Track when exercise starts
+function onExerciseStart(exerciseId) {
+    currentExerciseStartTime = Date.now();
+}
+
+// Track when exercise ends (user navigates away)
+function onExerciseLeave() {
+    if (currentExerciseStartTime && exercises[currentExercise]) {
+        const exerciseId = exercises[currentExercise].id;
+        const timeSpent = Date.now() - currentExerciseStartTime;
+        const state = getExerciseState(exerciseId);
+        state.totalTimeSpent += timeSpent;
+        sessionState.statistics.totalTimeSpent += timeSpent;
+        currentExerciseStartTime = null;
+    }
+}
+
+// Update statistics after an attempt
+function updateExerciseStats(exerciseId, isCorrect) {
+    const state = getExerciseState(exerciseId);
+    const ex = exercises.find(e => e.id === exerciseId);
+
+    if (!state.firstAttemptTime) {
+        state.firstAttemptTime = Date.now();
+    }
+
+    state.attempts++;
+    sessionState.statistics.totalAttempts++;
+
+    if (isCorrect && !state.isCompleted) {
+        state.isCompleted = true;
+        state.completedTime = Date.now();
+        sessionState.statistics.totalCompleted++;
+    }
+
+    recalculateHardestExercises();
+    updateStatisticsDisplay();
+    saveProgress();
+}
+
+// Recalculate hardest exercises (those with most attempts)
+function recalculateHardestExercises() {
+    const completedExercises = Object.values(sessionState.exercises)
+        .filter(e => e.isCompleted && e.attempts > 1)
+        .sort((a, b) => b.attempts - a.attempts)
+        .slice(0, 5);
+
+    sessionState.statistics.hardestExercises = completedExercises;
+}
+
+// Update statistics display panel
+function updateStatisticsDisplay() {
+    // Total time (only update if timer has started)
+    if (sessionTimerStarted) {
+        const totalTime = sessionState.statistics.totalTimeSpent;
+        document.getElementById('statTotalTime').textContent = formatTime(totalTime);
+    }
+
+    // Completed count
+    document.getElementById('statCompleted').textContent =
+        `${sessionState.statistics.totalCompleted} / ${exercises.length}`;
+
+    // Average attempts
+    const completedCount = sessionState.statistics.totalCompleted;
+    if (completedCount > 0) {
+        const completedExercises = Object.values(sessionState.exercises).filter(e => e.isCompleted);
+        const totalAttempts = completedExercises.reduce((sum, e) => sum + e.attempts, 0);
+        const avg = (totalAttempts / completedCount).toFixed(1);
+        document.getElementById('statAvgAttempts').textContent = avg;
+    } else {
+        document.getElementById('statAvgAttempts').textContent = '-';
+    }
+
+    // Hardest questions
+    const hardList = document.getElementById('hardQuestionsList');
+    const hardest = sessionState.statistics.hardestExercises;
+
+    if (hardest.length > 0) {
+        hardList.innerHTML = hardest.map(ex => {
+            const exercise = exercises.find(e => e.id === ex.id);
+            const cat = exercise ? exercise.category : 'unknown';
+            return `<li>#${ex.id} (${cat}) - ${ex.attempts} attempts</li>`;
+        }).join('');
+    } else {
+        hardList.innerHTML = '<li style="color: #999;">None yet</li>';
+    }
+}
+
+// Load from localStorage
+function loadProgress() {
+    const saved = localStorage.getItem('loopGymCompleted');
+    if (saved) {
+        completed = new Set(JSON.parse(saved));
+    }
+    const savedCurrent = localStorage.getItem('loopGymCurrent');
+    if (savedCurrent) {
+        currentExercise = parseInt(savedCurrent);
+    }
+
+    // Load session state
+    const savedSession = localStorage.getItem('loopGymSession');
+    if (savedSession) {
+        try {
+            const parsed = JSON.parse(savedSession);
+            Object.assign(sessionState.exercises, parsed.exercises || {});
+            Object.assign(sessionState.statistics, parsed.statistics || {});
+        } catch (e) {
+            console.error('Failed to load session state:', e);
+        }
+    }
+}
+
+function saveProgress() {
+    localStorage.setItem('loopGymCompleted', JSON.stringify([...completed]));
+    localStorage.setItem('loopGymCurrent', currentExercise);
+    localStorage.setItem('loopGymSession', JSON.stringify(sessionState));
+}
+
+// ===========================================
+// YAML EXPORT/IMPORT
+// ===========================================
+function exportProgress() {
+    const exportData = {
+        version: "1.0",
+        exportDate: new Date().toISOString(),
+        session: {
+            startTime: new Date(sessionStartTime).toISOString(),
+            totalTimeSpent: sessionState.statistics.totalTimeSpent
+        },
+        summary: {
+            totalExercises: exercises.length,
+            completed: sessionState.statistics.totalCompleted,
+            totalAttempts: sessionState.statistics.totalAttempts,
+            averageAttempts: sessionState.statistics.totalCompleted > 0
+                ? (Object.values(sessionState.exercises)
+                    .filter(e => e.isCompleted)
+                    .reduce((sum, e) => sum + e.attempts, 0) / sessionState.statistics.totalCompleted).toFixed(1)
+                : 0
+        },
+        exercises: Object.values(sessionState.exercises)
+            .filter(ex => ex.attempts > 0)
+            .map(ex => {
+                const exercise = exercises.find(e => e.id === ex.id);
+                return {
+                    id: ex.id,
+                    category: exercise ? exercise.category : 'unknown',
+                    difficulty: exercise ? (exercise.difficulty || 'easy') : 'unknown',
+                    type: exercise ? (exercise.exerciseType || 'tracing') : 'unknown',
+                    completed: ex.isCompleted,
+                    attempts: ex.attempts,
+                    timeSpent: ex.totalTimeSpent,
+                    completedAt: ex.completedTime ? new Date(ex.completedTime).toISOString() : null
+                };
+            }),
+        hardestQuestions: sessionState.statistics.hardestExercises.map(ex => ({
+            id: ex.id,
+            attempts: ex.attempts
+        }))
+    };
+
+    const yaml = jsyaml.dump(exportData, {
+        indent: 2,
+        lineWidth: 120,
+        noRefs: true
+    });
+
+    const blob = new Blob([yaml], { type: 'text/yaml' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `loop-gym-progress-${new Date().toISOString().split('T')[0]}.yaml`;
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
+function importProgress() {
+    document.getElementById('yamlFileInput').click();
+}
+
+function handleYamlUpload(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            const data = jsyaml.load(e.target.result);
+
+            if (!data.version || !data.exercises) {
+                throw new Error('Invalid progress file format');
+            }
+
+            // Restore session state
+            completed.clear();
+            sessionState.exercises = {};
+
+            for (const ex of data.exercises) {
+                sessionState.exercises[ex.id] = {
+                    id: ex.id,
+                    attempts: ex.attempts,
+                    isCompleted: ex.completed,
+                    totalTimeSpent: ex.timeSpent || 0,
+                    firstAttemptTime: null,
+                    completedTime: ex.completedAt ? new Date(ex.completedAt).getTime() : null
+                };
+
+                if (ex.completed) {
+                    completed.add(ex.id);
+                }
+            }
+
+            sessionState.statistics.totalCompleted = data.summary.completed;
+            sessionState.statistics.totalAttempts = data.summary.totalAttempts ||
+                data.exercises.reduce((sum, e) => sum + e.attempts, 0);
+            sessionState.statistics.totalTimeSpent = data.session.totalTimeSpent || 0;
+
+            recalculateHardestExercises();
+            updateProgress();
+            updateExerciseList();
+            updateStatisticsDisplay();
+            renderExercise();
+            saveProgress();
+
+            alert(`Progress loaded!\nCompleted: ${data.summary.completed}/${data.summary.totalExercises}`);
+        } catch (error) {
+            alert('Failed to load progress: ' + error.message);
+        }
+    };
+    reader.readAsText(file);
+    event.target.value = ''; // Reset file input
+}
+
+function resetProgress() {
+    if (!confirm('Are you sure you want to reset all progress? This cannot be undone.')) {
+        return;
+    }
+
+    // Clear all state
+    completed.clear();
+    sessionState.exercises = {};
+    sessionState.statistics = {
+        totalCompleted: 0,
+        totalAttempts: 0,
+        totalTimeSpent: 0,
+        hardestExercises: []
+    };
+
+    // Reset timer
+    sessionTimerStarted = false;
+    sessionStartTime = null;
+    if (sessionTimerInterval) {
+        clearInterval(sessionTimerInterval);
+        sessionTimerInterval = null;
+    }
+
+    // Clear localStorage
+    localStorage.removeItem('loopGymProgress');
+
+    // Reset to first exercise
+    currentExercise = 0;
+    currentFilter = 'all';
+    goldilocksMode = false;
+
+    // Update all UI
+    document.getElementById('statTotalTime').textContent = 'Click workspace to start';
+    document.getElementById('statTotalTime').classList.add('timer-not-started');
+    document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
+    document.querySelector('.nav-btn').classList.add('active'); // First button (All)
+
+    updateTotalDisplay();
+    updateProgress();
+    updateExerciseList();
+    updateStatisticsDisplay();
+    renderExercise();
+
+    alert('All progress has been reset.');
+}
+
+// Initialize Pyodide
+async function initPyodide() {
+    pyodide = await loadPyodide();
+    document.getElementById('loading').classList.add('hidden');
+}
+
+// ===========================================
+// UI FUNCTIONS
+// ===========================================
+function updateProgress() {
+    let total, completedInSet;
+    if (goldilocksMode) {
+        total = goldilocksIds.length;
+        completedInSet = goldilocksIds.filter(id => completed.has(id)).length;
+    } else if (currentFilter === 'all') {
+        total = exercises.length;
+        completedInSet = completed.size;
+    } else {
+        const filtered = exercises.filter(ex => ex.category === currentFilter);
+        total = filtered.length;
+        completedInSet = filtered.filter(ex => completed.has(ex.id)).length;
+    }
+    const pct = Math.round((completedInSet / total) * 100);
+    document.getElementById('progressBar').style.width = pct + '%';
+    document.getElementById('progressBar').textContent = pct + '%';
+    document.getElementById('completedCount').textContent = completedInSet;
+    document.getElementById('currentNum').textContent = exercises[currentExercise].id;
+}
+
+// Helper to escape HTML
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// Render code with line numbers for debugging exercises
+function renderCodeWithLineNumbers(code) {
+    const lines = code.split('\n');
+    return `<div class="code-with-lines">
+        ${lines.map((line, i) => `
+            <div class="code-line">
+                <span class="line-num">${i + 1}</span>
+                <span class="line-content">${escapeHtml(line)}</span>
+            </div>
+        `).join('')}
+    </div>`;
+}
+
+function renderExercise() {
+    onExerciseLeave(); // Track time on previous exercise
+
+    const ex = exercises[currentExercise];
+    document.getElementById('exNum').textContent = '#' + ex.id;
+    document.getElementById('exCategory').textContent = ex.category;
+    document.getElementById('exQuestion').innerHTML = ex.question;
+
+    // Update difficulty badge
+    const difficulty = ex.difficulty || 'easy';
+    const diffBadge = document.getElementById('exDifficulty');
+    diffBadge.textContent = difficulty.charAt(0).toUpperCase() + difficulty.slice(1);
+    diffBadge.className = `difficulty-badge difficulty-${difficulty}`;
+
+    // Update type badge
+    const exerciseType = ex.exerciseType || 'tracing';
+    const typeBadge = document.getElementById('exType');
+    typeBadge.textContent = exerciseType.charAt(0).toUpperCase() + exerciseType.slice(1);
+    typeBadge.className = `type-badge type-${exerciseType}`;
+
+    // Handle different exercise types
+    const codeBlock = document.getElementById('exCode');
+    const ansSection = document.getElementById('answerSection');
+
+    if (exerciseType === 'tracing') {
+        // Standard tracing exercise
+        codeBlock.style.display = 'block';
+        codeBlock.textContent = ex.code;
+        ansSection.innerHTML = `
+            <label>Your Answer:</label>
+            <input type="text" class="answer-input" id="answerInput"
+                   placeholder="Type your answer here..."
+                   onkeypress="if(event.key==='Enter')checkAnswer()">
+        `;
+        // Clear workspace for tracing exercises (placeholder will show)
+        document.getElementById('workspace').value = '';
+    } else if (exerciseType === 'writing') {
+        // Writing exercise - hide code block, show starter in workspace
+        codeBlock.style.display = 'none';
+        ansSection.innerHTML = `
+            <p class="starter-code-label">Write your code in the workspace panel on the right, then click "Run & Check" to test it.</p>
+            <div class="test-results" id="testResults"></div>
+        `;
+        // Clear workspace for writing exercises
+        document.getElementById('workspace').value = '';
+    } else if (exerciseType === 'debugging') {
+        // Debugging exercise
+        if (ex.debugType === 'identify') {
+            // Show code with line numbers
+            codeBlock.style.display = 'none';
+            ansSection.innerHTML = `
+                ${renderCodeWithLineNumbers(ex.buggyCode)}
+                <div class="bug-info">
+                    <strong>Expected:</strong> ${ex.expectedBehavior}<br>
+                    <strong>Actual:</strong> ${ex.actualBehavior}
+                </div>
+                <label>Which line contains the bug?</label>
+                <input type="text" class="answer-input" id="answerInput"
+                       placeholder="Enter line number..."
+                       onkeypress="if(event.key==='Enter')checkAnswer()">
+            `;
+            // Clear workspace for identify exercises (placeholder will show)
+            document.getElementById('workspace').value = '';
+        } else {
+            // Fix the code - show buggy code in workspace
+            codeBlock.style.display = 'none';
+            ansSection.innerHTML = `
+                <p class="starter-code-label">Fix the bug in the code below (in the workspace panel), then click "Run & Check" to test it.</p>
+                <div class="test-results" id="testResults"></div>
+            `;
+            // Clear workspace for fix exercises
+            document.getElementById('workspace').value = '';
+        }
+    }
+
+    // Reset feedback and hints
+    document.getElementById('feedback').className = 'feedback';
+    document.getElementById('feedback').textContent = '';
+    document.getElementById('hintBox').classList.remove('visible');
+    document.getElementById('hintBox').textContent = '';
+
+    // Update navigation buttons
+    document.getElementById('prevBtn').disabled = currentExercise === 0;
+    document.getElementById('nextBtn').disabled = currentExercise === exercises.length - 1;
+
+    // Update check button text based on exercise type
+    const checkBtn = document.getElementById('checkBtn');
+    if (exerciseType === 'writing' || (exerciseType === 'debugging' && ex.debugType === 'fix')) {
+        checkBtn.textContent = 'Run & Check';
+    } else {
+        checkBtn.textContent = 'Check Answer';
+    }
+
+    onExerciseStart(ex.id); // Start tracking time
+    updateProgress();
+    updateStatisticsDisplay();
+    saveProgress();
+}
+
+// Normalize output for comparison
+function normalizeOutput(output) {
+    return String(output)
+        .trim()
+        .toLowerCase()
+        .replace(/\s+/g, ' ')
+        .replace(/\.0+$/, '');
+}
+
+// Run Python code safely with timeout
+async function runPythonCodeSafely(code, timeout = 5000) {
+    return new Promise((resolve, reject) => {
+        const timeoutId = setTimeout(() => {
+            reject(new Error('Execution timed out (possible infinite loop)'));
+        }, timeout);
+
+        try {
+            pyodide.runPython(`
+import sys
+from io import StringIO
+sys.stdout = StringIO()
+
+# MOCK INPUT TO PREVENT FREEZE
+def input(prompt=""):
+    raise Exception("input() does not work in Loop Gym. Please hardcode your values (e.g., v0 = 20) for testing.")
+`);
+            pyodide.runPython(code);
+            const result = pyodide.runPython('sys.stdout.getvalue()');
+            clearTimeout(timeoutId);
+            resolve(result.trim());
+        } catch (error) {
+            clearTimeout(timeoutId);
+            reject(error);
+        }
+    });
+}
+
+// Validate writing exercise against test cases
+async function validateWritingExercise(studentCode, exercise) {
+    const results = [];
+    const testCases = exercise.testCases || [];
+
+    for (const testCase of testCases) {
+        let fullCode;
+
+        // Function return validation: test case specifies a function call
+        if (testCase.call) {
+            // Student must define a function; we call it and check return value
+            fullCode = `${studentCode}\n\n__result__ = ${testCase.call}\nprint(__result__)`;
+        } else if (testCase.input && testCase.input.includes('(')) {
+            // Legacy: If test case has 'input' as a function call, append print
+            fullCode = `${studentCode}\n\nprint(${testCase.input})`;
+        } else {
+            // Just run the code and capture output
+            fullCode = studentCode;
+        }
+
+        try {
+            const output = await runPythonCodeSafely(fullCode);
+            let passed = false;
+
+            // 1. Try String Comparison (Normalized)
+            const normOutput = normalizeOutput(output);
+            const normExpected = normalizeOutput(testCase.expected);
+
+            if (normOutput === normExpected) {
+                passed = true;
+            } else {
+                // 2. Try Numeric Comparison (if strings don't match)
+                // Extract the last number from output (handling potential print debris)
+                const outputNum = parseFloat(output.trim().split('\n').pop());
+                const expectedNum = parseFloat(testCase.expected);
+
+                if (!isNaN(outputNum) && !isNaN(expectedNum)) {
+                    // Allow 1% error or 0.01 absolute difference
+                    if (Math.abs(outputNum - expectedNum) < 0.01 ||
+                        Math.abs((outputNum - expectedNum) / expectedNum) < 0.01) {
+                        passed = true;
+                    }
+                }
+            }
+
+            results.push({
+                input: testCase.call || testCase.input || 'Output',
+                expected: testCase.expected,
+                actual: output,
+                passed: passed
+            });
+        } catch (error) {
+            results.push({
+                input: testCase.call || testCase.input || 'Output',
+                expected: testCase.expected,
+                actual: `Error: ${error.message}`,
+                passed: false
+            });
+        }
+    }
+
+    return {
+        allPassed: results.every(r => r.passed),
+        results: results,
+        totalPassed: results.filter(r => r.passed).length,
+        totalTests: results.length
+    };
+}
+
+// Display test results
+function displayTestResults(validation) {
+    const resultsDiv = document.getElementById('testResults');
+    if (!resultsDiv) return;
+
+    resultsDiv.innerHTML = validation.results.map(r => `
+        <div class="test-case ${r.passed ? 'passed' : 'failed'}">
+            <div class="test-label">${r.passed ? '✓' : '✗'} ${escapeHtml(r.input)}</div>
+            <div class="test-expected">Expected: ${escapeHtml(r.expected)}</div>
+            <div class="test-actual">Got: ${escapeHtml(r.actual)}</div>
+        </div>
+    `).join('');
+}
+
+async function checkAnswer() {
+    const ex = exercises[currentExercise];
+    const exerciseType = ex.exerciseType || 'tracing';
+    const feedback = document.getElementById('feedback');
+
+    let isCorrect = false;
+
+    if (exerciseType === 'tracing' || (exerciseType === 'debugging' && ex.debugType === 'identify')) {
+        // Text-based answer
+        const userAnswer = document.getElementById('answerInput').value.trim();
+        const input = document.getElementById('answerInput');
+
+        // Normalize answers for comparison
+        const normalizedUser = userAnswer.toLowerCase().replace(/\s+/g, ' ');
+        const normalizedCorrect = ex.answer.toLowerCase().replace(/\s+/g, ' ');
+
+        isCorrect = normalizedUser === normalizedCorrect;
+
+        // Check alternate answers
+        if (!isCorrect && ex.alternateAnswers) {
+            for (const alt of ex.alternateAnswers) {
+                if (normalizedUser === alt.toLowerCase().replace(/\s+/g, ' ')) {
+                    isCorrect = true;
+                    break;
+                }
+            }
+        }
+
+        // Try parsing as number
+        if (!isCorrect) {
+            const userNum = parseFloat(userAnswer);
+            const correctNum = parseFloat(ex.answer);
+            if (!isNaN(userNum) && !isNaN(correctNum)) {
+                isCorrect = Math.abs(userNum - correctNum) < 0.01;
+            }
+        }
+
+        if (isCorrect) {
+            feedback.className = 'feedback correct';
+            feedback.innerHTML = '<strong>Correct!</strong> ' + ex.solution;
+            input.classList.add('correct');
+            input.classList.remove('incorrect');
+        } else {
+            feedback.className = 'feedback incorrect';
+            feedback.innerHTML = '<strong>Not quite.</strong> Try again or click "Hint" for help.';
+            input.classList.add('incorrect');
+            input.classList.remove('correct');
+        }
+
+    } else if (exerciseType === 'writing' || (exerciseType === 'debugging' && ex.debugType === 'fix')) {
+        // Code-based answer - validate against test cases
+        const studentCode = document.getElementById('workspace').value;
+
+        if (!pyodide) {
+            feedback.className = 'feedback incorrect';
+            feedback.innerHTML = 'Python is still loading. Please wait...';
+            return;
+        }
+
+        try {
+            const validation = await validateWritingExercise(studentCode, ex);
+            displayTestResults(validation);
+
+            if (validation.allPassed) {
+                isCorrect = true;
+                feedback.className = 'feedback correct';
+                feedback.innerHTML = `<strong>All ${validation.totalTests} tests passed!</strong> ${ex.solution}`;
+            } else {
+                feedback.className = 'feedback incorrect';
+                feedback.innerHTML = `<strong>${validation.totalPassed}/${validation.totalTests} tests passed.</strong> Check the results above and try again.`;
+            }
+        } catch (error) {
+            feedback.className = 'feedback incorrect';
+            feedback.innerHTML = `<strong>Error:</strong> ${error.message}`;
+        }
+    }
+
+    // Update statistics
+    updateExerciseStats(ex.id, isCorrect);
+
+    if (isCorrect) {
+        completed.add(ex.id);
+        saveProgress();
+        updateProgress();
+        updateExerciseList();
+    }
+}
+
+function toggleHint() {
+    const hintBox = document.getElementById('hintBox');
+    const ex = exercises[currentExercise];
+    hintBox.textContent = ex.hint;
+    hintBox.classList.toggle('visible');
+}
+
+
+function nextExercise() {
+    onExerciseLeave();
+    if (goldilocksMode) {
+        // Find next goldilocks exercise
+        const currentId = exercises[currentExercise].id;
+        const currentGoldilocksIdx = goldilocksIds.indexOf(currentId);
+        if (currentGoldilocksIdx < goldilocksIds.length - 1) {
+            const nextId = goldilocksIds[currentGoldilocksIdx + 1];
+            currentExercise = exercises.findIndex(ex => ex.id === nextId);
+            renderExercise();
+        }
+    } else if (currentExercise < exercises.length - 1) {
+        currentExercise++;
+        renderExercise();
+    }
+}
+
+function prevExercise() {
+    onExerciseLeave();
+    if (goldilocksMode) {
+        // Find previous goldilocks exercise
+        const currentId = exercises[currentExercise].id;
+        const currentGoldilocksIdx = goldilocksIds.indexOf(currentId);
+        if (currentGoldilocksIdx > 0) {
+            const prevId = goldilocksIds[currentGoldilocksIdx - 1];
+            currentExercise = exercises.findIndex(ex => ex.id === prevId);
+            renderExercise();
+        }
+    } else if (currentExercise > 0) {
+        currentExercise--;
+        renderExercise();
+    }
+}
+
+function filterCategory(category) {
+    currentFilter = category;
+    goldilocksMode = false;
+
+    // Update nav buttons
+    document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
+    event.target.classList.add('active');
+
+    // Find first exercise in category
+    if (category === 'all') {
+        currentExercise = 0;
+    } else {
+        const idx = exercises.findIndex(ex => ex.category === category);
+        if (idx !== -1) currentExercise = idx;
+    }
+
+    updateTotalDisplay();
+    renderExercise();
+    updateExerciseList();
+}
+
+function filterGoldilocks() {
+    goldilocksMode = true;
+    currentFilter = 'goldilocks';
+
+    // Update nav buttons
+    document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
+    event.target.classList.add('active');
+
+    // Go to first goldilocks exercise
+    const firstGoldilocksIdx = exercises.findIndex(ex => goldilocksIds.includes(ex.id));
+    if (firstGoldilocksIdx !== -1) currentExercise = firstGoldilocksIdx;
+
+    updateTotalDisplay();
+    renderExercise();
+    updateExerciseList();
+}
+
+function updateTotalDisplay() {
+    const totalEl = document.getElementById('totalCount');
+    if (goldilocksMode) {
+        totalEl.textContent = goldilocksIds.length;
+    } else if (currentFilter === 'all') {
+        totalEl.textContent = exercises.length;
+    } else {
+        const count = exercises.filter(ex => ex.category === currentFilter).length;
+        totalEl.textContent = count;
+    }
+}
+
+function toggleExerciseList() {
+    document.getElementById('exerciseList').classList.toggle('visible');
+    document.getElementById('overlay').classList.toggle('visible');
+}
+
+function updateExerciseList() {
+    const container = document.getElementById('exerciseListItems');
+    let filtered;
+    if (goldilocksMode) {
+        filtered = exercises.filter(ex => goldilocksIds.includes(ex.id));
+    } else if (currentFilter === 'all') {
+        filtered = exercises;
+    } else {
+        filtered = exercises.filter(ex => ex.category === currentFilter);
+    }
+
+    container.innerHTML = filtered.map(ex => {
+        const idx = exercises.findIndex(e => e.id === ex.id);
+        const isCompleted = completed.has(ex.id);
+        const isCurrent = idx === currentExercise;
+        const state = sessionState.exercises[ex.id];
+        const attempts = state ? state.attempts : 0;
+
+        let classes = 'exercise-list-item';
+        if (isCompleted) classes += ' completed';
+        if (isCurrent) classes += ' current';
+
+        const difficulty = ex.difficulty || 'easy';
+        const exerciseType = ex.exerciseType || 'tracing';
+        const diffBadge = `<span class="difficulty-badge difficulty-${difficulty}" style="font-size:0.6em;padding:1px 5px;">${difficulty.charAt(0).toUpperCase()}</span>`;
+        const attemptsHtml = attempts > 1 ? `<span class="attempts-badge">${attempts}x</span>` : '';
+
+        const name = ex.name || '';
+        return `<div class="${classes}" onclick="goToExercise(${idx})">
+            <span>#${ex.id} ${diffBadge} ${name} ${attemptsHtml}</span>
+            <span>${isCompleted ? '✓' : ''}</span>
+        </div>`;
+    }).join('');
+}
+
+function goToExercise(idx) {
+    onExerciseLeave();
+    currentExercise = idx;
+    renderExercise();
+    toggleExerciseList();
+}
+
+async function runWorkspace() {
+    const code = document.getElementById('workspace').value;
+    const output = document.getElementById('output');
+
+    if (!pyodide) {
+        output.textContent = 'Python is still loading...';
+        return;
+    }
+
+    output.classList.remove('error');
+
+    try {
+        pyodide.runPython(`
+import sys
+from io import StringIO
+sys.stdout = StringIO()
+`);
+        pyodide.runPython(code);
+        const result = pyodide.runPython('sys.stdout.getvalue()');
+        output.textContent = result || '(No output)';
+    } catch (err) {
+        output.classList.add('error');
+        output.textContent = 'Error: ' + err.message;
+    }
+}
+
+function clearWorkspace() {
+    document.getElementById('workspace').value = '';
+    document.getElementById('output').textContent = 'Click "Run Code" to execute...';
+    document.getElementById('output').classList.remove('error');
+}
+
+// Handle Tab in workspace
+document.getElementById('workspace').addEventListener('keydown', function(e) {
+    if (e.key === 'Tab') {
+        e.preventDefault();
+        const start = this.selectionStart;
+        const end = this.selectionEnd;
+        this.value = this.value.substring(0, start) + '    ' + this.value.substring(end);
+        this.selectionStart = this.selectionEnd = start + 4;
+    }
+});
+
+// ===========================================
+// INITIALIZATION
+// ===========================================
+loadProgress();
+initPyodide();
+renderExercise();
+updateExerciseList();
+updateStatisticsDisplay();
+setupWorkspaceListeners();
+    </script>
+</body>
+</html>
