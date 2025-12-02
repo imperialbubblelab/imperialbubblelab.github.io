@@ -3186,12 +3186,23 @@ function renderExercise() {
         } else {
             // Fix the code - show buggy code in workspace
             codeBlock.style.display = 'none';
+            const expectedText = escapeHtml(
+                ex.expectedBehavior ||
+                (ex.testCases && ex.testCases[0] && ex.testCases[0].expected) ||
+                'See test cases for expected output'
+            );
+            const actualText = escapeHtml(ex.actualBehavior || 'Current code fails the tests.');
             ansSection.innerHTML = `
-                <p class="starter-code-label">Fix the bug in the code below (in the workspace panel), then click "Run & Check" to test it.</p>
+                ${renderCodeWithLineNumbers(ex.buggyCode)}
+                <div class="bug-info">
+                    <strong>Expected:</strong> ${expectedText}<br>
+                    <strong>Actual:</strong> ${actualText}
+                </div>
+                <p class="starter-code-label">Fix the bug in the code above (it is also loaded into the workspace), then click "Run & Check" to test it.</p>
                 <div class="test-results" id="testResults"></div>
             `;
-            // Clear workspace for fix exercises
-            document.getElementById('workspace').value = '';
+            // Load buggy code into workspace for editing
+            document.getElementById('workspace').value = ex.buggyCode || '';
         }
     }
 
@@ -3226,6 +3237,27 @@ function normalizeOutput(output) {
         .toLowerCase()
         .replace(/\s+/g, ' ')
         .replace(/\.0+$/, '');
+}
+
+// Detect if the student's code is just a single print of the expected output
+function isDirectPrintSolution(code, expectedOutput) {
+    const lines = code
+        .split('\n')
+        .map(line => line.trim())
+        .filter(line => line && !line.startsWith('#'));
+
+    if (lines.length !== 1) return false;
+
+    const match = lines[0].match(/^print\(([\s\S]+)\)$/);
+    if (!match) return false;
+
+    // Extract literal inside quotes if present
+    const arg = match[1].trim();
+    const strMatch = arg.match(/^(['"])([\s\S]*)\1$/);
+    if (!strMatch) return false;
+
+    const literal = strMatch[2].replace(/\\n/g, '\n');
+    return normalizeOutput(literal) === normalizeOutput(expectedOutput);
 }
 
 // Run Python code safely with timeout
@@ -3286,6 +3318,17 @@ async function validateWritingExercise(studentCode, exercise) {
 
             if (normOutput === normExpected) {
                 passed = true;
+                // Disallow trivial solutions that only print the expected output
+                if (!testCase.call && isDirectPrintSolution(studentCode, testCase.expected)) {
+                    passed = false;
+                    results.push({
+                        input: testCase.call || testCase.input || 'Output',
+                        expected: testCase.expected,
+                        actual: 'Direct print of expected output detected. Implement the logic instead of hardcoding the answer.',
+                        passed: false
+                    });
+                    continue;
+                }
             } else {
                 // 2. Try Numeric Comparison (if strings don't match)
                 // Extract the last number from output (handling potential print debris)
