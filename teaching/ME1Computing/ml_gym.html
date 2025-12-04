@@ -743,17 +743,44 @@ const exercises = [
         exerciseType: "writing",
         question: "Use <code>numpy</code> to create a simple dataset with X = [[1], [2], [3], [4], [5]] and y = [2, 4, 6, 8, 10].<br>Then use <code>sklearn.linear_model.LinearRegression</code> to fit a model and print the prediction for input [[6]].",
         starterCode: `import numpy as np
+import matplotlib.pyplot as plt
 from sklearn.linear_model import LinearRegression
 
-# 1. Create the data (X must be 2D array, y is 1D)
+# Setup data and model
 X = np.array([[1], [2], [3], [4], [5]])
 y = np.array([2, 4, 6, 8, 10])
+model = LinearRegression()
+model.fit(X, y)
 
-# 2. Initialize and train the model
-# model = ...
-# model.fit(...)
+# Prediction
+X_new = [[6]]
+prediction = model.predict(X_new)
 
-# 3. Predict for value [[6]] and print it
+# 3. Predict and print ONLY the raw result for the grader
+prediction = model.predict([[6]])
+print(prediction)
+
+# --- PLOTTING ---
+plt.figure(figsize=(8, 5))
+
+# 1. Plot Training Data
+plt.scatter(X, y, color='blue', label='Training Data')
+
+# 2. Plot Regression Line (Extending slightly past data)
+x_range = np.array([[0], [7]])
+y_range = model.predict(x_range)
+plt.plot(x_range, y_range, color='red', linestyle='--', label='Regression Line')
+
+# 3. Plot Prediction
+plt.scatter(X_new, prediction, color='green', marker='*', s=200, zorder=5, label=f'Prediction: {prediction[0]:.1f}')
+
+# Styling
+plt.title('Linear Regression Visualization')
+plt.xlabel('Input (X)')
+plt.ylabel('Target (y)')
+plt.legend()
+plt.grid(True, alpha=0.3)
+plt.show()
 `,
         testCases: [
             { input: "Output", expected: "[12.]" }
