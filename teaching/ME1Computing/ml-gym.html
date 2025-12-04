@@ -14,6 +14,8 @@
     <!-- <script src="./pyodide/pyodide.js"></script> -->
     
     <script src="https://cdn.jsdelivr.net/npm/js-yaml@4.1.0/dist/js-yaml.min.js"></script>
+    <!-- Added jsPDF for PDF export -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -272,9 +274,38 @@
             justify-content: center;
             align-items: center;
             margin-top: 10px;
+            overflow: hidden; /* For zoom scaling */
+            position: relative;
         }
-        .plot-panel img { max-width: 100%; height: auto; }
+        .plot-panel img { 
+            max-width: 100%; 
+            height: auto; 
+            transition: transform 0.2s ease-out;
+            transform-origin: center center;
+        }
         .plot-placeholder { color: #999; font-style: italic; }
+
+        /* Plot Toolbar */
+        .plot-toolbar {
+            display: flex;
+            gap: 5px;
+            background: #f0f0f0;
+            padding: 4px;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+        }
+        .plot-btn {
+            padding: 4px 10px;
+            font-size: 0.8em;
+            cursor: pointer;
+            border: 1px solid #ccc;
+            background: #fff;
+            border-radius: 3px;
+            color: #333;
+            transition: background 0.2s;
+        }
+        .plot-btn:hover { background: #e0e0e0; }
+        .plot-btn:active { background: #d0d0d0; }
 
         .feedback {
             margin-top: 15px;
@@ -559,7 +590,7 @@
     </div>
 
     <div class="container">
-        <h1>ML GYM </h1>
+        <h1>LOOP GYM <span class="ml-badge">ML Edition</span></h1>
 
         <div class="progress-row">
             <div class="progress-container">
@@ -635,7 +666,16 @@
                     
                     <!-- Plot Section moved inside Workspace -->
                     <div id="plotContainer" style="margin-top: 15px; display: none;">
-                        <label style="font-weight: 500; margin-bottom: 5px; display: block;">Plot:</label>
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                            <label style="font-weight: 500; display: block; margin: 0;">Plot:</label>
+                            <div class="plot-toolbar">
+                                <button class="plot-btn" onclick="zoomPlot(0.1)" title="Zoom In">+</button>
+                                <button class="plot-btn" onclick="zoomPlot(-0.1)" title="Zoom Out">-</button>
+                                <button class="plot-btn" onclick="resetPlot()" title="Reset Zoom">Reset</button>
+                                <button class="plot-btn" onclick="downloadPlot()" title="Download PNG">PNG</button>
+                                <button class="plot-btn" onclick="downloadPlotPDF()" title="Download PDF">PDF</button>
+                            </div>
+                        </div>
                         <div class="plot-panel" id="plotArea" style="min-height: auto;">
                             <!-- Plot will appear here -->
                         </div>
@@ -703,44 +743,17 @@ const exercises = [
         exerciseType: "writing",
         question: "Use <code>numpy</code> to create a simple dataset with X = [[1], [2], [3], [4], [5]] and y = [2, 4, 6, 8, 10].<br>Then use <code>sklearn.linear_model.LinearRegression</code> to fit a model and print the prediction for input [[6]].",
         starterCode: `import numpy as np
-import matplotlib.pyplot as plt
 from sklearn.linear_model import LinearRegression
 
-# Setup data and model
+# 1. Create the data (X must be 2D array, y is 1D)
 X = np.array([[1], [2], [3], [4], [5]])
 y = np.array([2, 4, 6, 8, 10])
-model = LinearRegression()
-model.fit(X, y)
 
-# Prediction
-X_new = [[6]]
-prediction = model.predict(X_new)
+# 2. Initialize and train the model
+# model = ...
+# model.fit(...)
 
-# 3. Predict and print ONLY the raw result for the grader
-prediction = model.predict([[6]])
-print(prediction)
-
-# --- PLOTTING ---
-plt.figure(figsize=(8, 5))
-
-# 1. Plot Training Data
-plt.scatter(X, y, color='blue', label='Training Data')
-
-# 2. Plot Regression Line (Extending slightly past data)
-x_range = np.array([[0], [7]])
-y_range = model.predict(x_range)
-plt.plot(x_range, y_range, color='red', linestyle='--', label='Regression Line')
-
-# 3. Plot Prediction
-plt.scatter(X_new, prediction, color='green', marker='*', s=200, zorder=5, label=f'Prediction: {prediction[0]:.1f}')
-
-# Styling
-plt.title('Linear Regression Visualization')
-plt.xlabel('Input (X)')
-plt.ylabel('Target (y)')
-plt.legend()
-plt.grid(True, alpha=0.3)
-plt.show()
+# 3. Predict for value [[6]] and print it
 `,
         testCases: [
             { input: "Output", expected: "[12.]" }
@@ -773,6 +786,7 @@ let currentExerciseStartTime = null;
 let sessionStartTime = null;
 let sessionTimerInterval = null;
 let sessionTimerStarted = false;
+let currentZoom = 1; // Current zoom level for plots
 
 const sessionState = {
     exercises: {},
@@ -994,14 +1008,64 @@ async function initPyodide() {
 function showPlot(imgStr) {
     const plotContainer = document.getElementById('plotContainer');
     const plotArea = document.getElementById('plotArea');
-    plotArea.innerHTML = `<img src="data:image/png;base64,${imgStr}" />`;
+    
+    // Reset zoom state
+    resetPlot();
+    
+    // Explicitly empty the plot area before adding new plot
+    plotArea.innerHTML = '';
+    
+    const img = document.createElement('img');
+    img.id = 'plotImage';
+    img.src = `data:image/png;base64,${imgStr}`;
+    plotArea.appendChild(img);
+    
     plotContainer.style.display = 'block'; // Show container
+}
+
+// Plot Controls
+function zoomPlot(delta) {
+    const img = document.getElementById('plotImage');
+    if (!img) return;
+    currentZoom += delta;
+    if (currentZoom < 0.1) currentZoom = 0.1;
+    img.style.transform = `scale(${currentZoom})`;
+}
+
+function resetPlot() {
+    currentZoom = 1;
+    const img = document.getElementById('plotImage');
+    if (img) img.style.transform = 'scale(1)';
+}
+
+function downloadPlot() {
+    const img = document.getElementById('plotImage');
+    if (!img) return;
+    const a = document.createElement('a');
+    a.href = img.src;
+    a.download = `plot_${new Date().toISOString().slice(0,19).replace(/[:]/g,"-")}.png`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+}
+
+function downloadPlotPDF() {
+    const img = document.getElementById('plotImage');
+    if (!img) return;
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    const imgProps = doc.getImageProperties(img.src);
+    const pdfWidth = doc.internal.pageSize.getWidth();
+    const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+    doc.addImage(img.src, 'PNG', 0, 0, pdfWidth, pdfHeight);
+    doc.save(`plot_${new Date().toISOString().slice(0,19).replace(/[:]/g,"-")}.pdf`);
 }
 
 async function runWorkspace() {
     const code = document.getElementById('workspace').value;
     const output = document.getElementById('output');
     const plotContainer = document.getElementById('plotContainer');
+    const plotArea = document.getElementById('plotArea');
 
     if (!pyodide) {
         output.textContent = 'Python is still loading...';
@@ -1010,19 +1074,24 @@ async function runWorkspace() {
 
     output.classList.remove('error');
     
-    // Hide plot initially for new run
+    // STRICT CLEAR: Hide and clear plot html for new run to prevent visual stacking
     plotContainer.style.display = 'none';
+    plotArea.innerHTML = '';
 
     try {
         // Setup plotting backend
+        // We switch backend to 'agg' to prevent side-effects
+        // We close all plots before AND after
         await pyodide.runPythonAsync(`
 import sys
 import io
 import base64
 import matplotlib.pyplot as plt
 
-# Clear previous plots
-plt.clf()
+# 1. Clear ALL previous plots to prevent stacking
+plt.close('all')
+# 2. Switch backend to non-interactive to prevent auto-display
+plt.switch_backend('agg')
 
 # Redirect stdout
 sys.stdout = io.StringIO()
@@ -1041,10 +1110,12 @@ is_plot = False
 if plt.get_fignums():
     is_plot = True
     buf = io.BytesIO()
+    # Save the current figure
     plt.savefig(buf, format='png')
     buf.seek(0)
     img_str = base64.b64encode(buf.read()).decode('utf-8')
-    plt.close()
+    # Close figures to free memory and prevent stacking
+    plt.close('all') 
 is_plot
 `);
         
@@ -1063,8 +1134,12 @@ function clearWorkspace() {
     document.getElementById('workspace').value = '';
     document.getElementById('output').textContent = 'Click "Run Code" to execute...';
     document.getElementById('output').classList.remove('error');
-    document.getElementById('plotContainer').style.display = 'none';
-    document.getElementById('plotArea').innerHTML = '';
+    
+    // Robust clearing of plot area
+    const plotContainer = document.getElementById('plotContainer');
+    const plotArea = document.getElementById('plotArea');
+    if (plotContainer) plotContainer.style.display = 'none';
+    if (plotArea) plotArea.innerHTML = '';
 }
 
 // ===========================================
