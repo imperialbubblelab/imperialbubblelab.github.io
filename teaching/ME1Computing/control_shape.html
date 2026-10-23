@@ -1,0 +1,927 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>The shape of control flow</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,500;0,700;1,400&display=swap" rel="stylesheet">
+<style>
+:root {
+  --page: #000000;
+  --ink: #FFFFFF;
+  --muted: #9C9C9C;
+  --rule: #2E2E2E;
+  --edge: #3A3A3A;
+  --hover: #1A1A1A;
+  --font: "Helvetica Neue", Helvetica, Arial, "Nimbus Sans", "Liberation Sans", sans-serif;
+  --mono: "JetBrains Mono", "SF Mono", Menlo, Consolas, "Liberation Mono", "DejaVu Sans Mono", monospace;
+  color-scheme: dark;
+  box-sizing: border-box;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --page: #000000; --ink: #FFFFFF; } }
+:root[data-theme="dark"] { --page: #000000; --ink: #FFFFFF; }
+*, *::before, *::after { box-sizing: border-box; }
+html { background: var(--page); scroll-padding-top: env(safe-area-inset-top, 0px); -webkit-text-size-adjust: 100%; }
+body { margin: 0; background: var(--page); color: var(--ink); font-family: var(--font); font-size: 17px; line-height: 1.5; -webkit-font-smoothing: antialiased; min-height: 100vh; }
+button { font: inherit; color: inherit; }
+:focus-visible { outline: 3px solid #1E5BD0; outline-offset: 3px; }
+.wrap { max-width: 1500px; margin: 0 auto; padding: 0 20px; }
+
+/* station sign: black band, thin white rule near the top */
+.station { position: relative; padding: 40px 0 26px; border-bottom: 1px solid var(--rule); }
+.station::before, .sign::before { content: ""; position: absolute; left: 0; right: 0; top: 12px; height: 2px; background: var(--ink); }
+.station h1 { margin: 0; font-weight: 700; font-size: clamp(2.1rem, 5.6vw, 4.2rem); line-height: 1; letter-spacing: -.025em; }
+.head { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px 32px; }
+.logo { flex: none; display: block; width: clamp(150px, 20vw, 290px); height: auto; color: #FFFFFF; margin-top: .5rem; }
+@media (max-width: 700px) { .head { flex-direction: column-reverse; } .logo { align-self: flex-end; margin-top: 0; } }
+
+.bullet {
+  width: 2.2em; height: 2.2em; border-radius: 50%; flex: none;
+  display: inline-grid; place-items: center;
+  background: var(--c); color: #FFFFFF; font-weight: 700; line-height: 1; font-size: 1.1rem;
+}
+
+/* page layout: routes down the side, then the map, then the trace */
+.layout { display: grid; grid-template-columns: 232px minmax(0, 1fr); gap: 22px; align-items: start; margin: 22px auto 56px; }
+.routes { position: sticky; top: 14px; display: flex; flex-direction: column; gap: 8px; }
+.routebtn {
+  display: flex; align-items: center; gap: 12px; text-align: left; cursor: pointer; width: 100%;
+  background: var(--page); color: var(--ink); border: 2px solid var(--edge); border-radius: 12px; padding: 9px 12px;
+}
+.routebtn:hover { background: var(--hover); }
+.routebtn[aria-pressed="true"] { border-color: var(--ink); }
+.routebtn b { display: block; font-size: 1.05rem; line-height: 1.2; }
+.routebtn small { display: block; color: var(--muted); font-size: .85rem; margin-top: 1px; }
+
+.controls { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 12px; }
+.group { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; }
+.seg { display: inline-flex; border: 2px solid var(--edge); border-radius: 999px; overflow: hidden; min-height: 42px; }
+.seg[hidden] { display: none; }
+.seg button { border: 0; background: transparent; color: inherit; padding: 0 14px; font-weight: 700; cursor: pointer; white-space: nowrap; }
+.seg button + button { border-left: 2px solid var(--edge); }
+.seg button:hover { background: var(--hover); }
+.seg button[aria-pressed="true"] { background: var(--ink); color: var(--page); }
+.tool {
+  min-height: 42px; padding: 0 16px; border-radius: 999px; border: 2px solid var(--edge);
+  background: transparent; color: inherit; font-weight: 700; display: inline-flex; align-items: center; gap: 8px; cursor: pointer; white-space: nowrap;
+}
+.tool:hover { background: var(--hover); }
+.tool[aria-pressed="true"] { background: var(--ink); color: var(--page); border-color: var(--ink); }
+.tool.main { background: var(--ink); color: var(--page); border-color: var(--ink); }
+.tool.main:hover { opacity: .85; }
+.tool:disabled { opacity: .35; cursor: default; }
+.tool svg { width: 15px; height: 15px; flex: none; }
+
+.stage { display: grid; grid-template-columns: minmax(0, 1fr) 350px; gap: 18px; align-items: start; margin-top: 16px; }
+@media (max-width: 1200px) { .stage { grid-template-columns: minmax(0, 1fr); } }
+
+/* themed panels: black by default, white on request */
+.theme {
+  --map-bg: #000000; --map-ink: #FFFFFF; --map-ph: #A8A8A8; --map-hint: #BDBDBD; --map-desc: #D0D0D0;
+  --map-band: #262626; --map-blank: #363636; --map-blank-hover: #4A4A4A; --map-rule: #333333; --map-box: #141414;
+  background: var(--map-bg); color: var(--map-ink); border: 1px solid var(--edge); border-radius: 10px; overflow: hidden;
+}
+body.paper .theme {
+  --map-bg: #FFFFFF; --map-ink: #111111; --map-ph: #6D6E71; --map-hint: #555555; --map-desc: #333333;
+  --map-band: #EEEEEE; --map-blank: #DADADA; --map-blank-hover: #C4C4C4; --map-rule: #DDDDDD; --map-box: #F4F4F4;
+  border-color: transparent;
+}
+body.paper .theme .seg, body.paper .theme .tool:not(.main) { border-color: #CFCFCF; }
+body.paper .theme .seg button + button { border-left-color: #CFCFCF; }
+body.paper .theme .seg button:hover, body.paper .theme .tool:not(.main):hover { background: #EFEFEF; }
+body.paper .theme .seg button[aria-pressed="true"] { background: #111; color: #fff; }
+body.paper .theme .tool.main { background: #111; color: #fff; border-color: #111; }
+
+.sign { position: relative; background: #000; color: #fff; border-bottom: 1px solid var(--map-rule); display: flex; align-items: center; gap: 16px; flex-wrap: wrap; padding: 32px clamp(16px, 3vw, 36px) 18px; }
+.sign .bullet { font-size: clamp(1.25rem, 2.4vw, 1.75rem); }
+.sign h2 { margin: 0; font-size: clamp(1.7rem, 3.8vw, 2.8rem); line-height: 1; font-weight: 700; letter-spacing: -.02em; }
+.sign .nick { font-size: clamp(1rem, 1.7vw, 1.3rem); color: #BDBDBD; font-weight: 500; }
+.sign .row-of-bullets { display: flex; flex-wrap: wrap; gap: 8px; }
+.sign .row-of-bullets .bullet { font-size: clamp(.9rem, 1.5vw, 1.1rem); }
+.body { padding: clamp(16px, 2.6vw, 30px) clamp(16px, 3vw, 36px) clamp(16px, 2.4vw, 26px); }
+.desc { margin: 0; font-size: clamp(1rem, 1.5vw, 1.15rem); color: var(--map-desc); max-width: 46em; }
+.figure { margin: clamp(16px, 2.6vw, 26px) 0 0; overflow-x: auto; }
+.figure svg { display: block; max-width: 100%; height: auto; }
+.legend { list-style: none; margin: clamp(16px, 2.6vw, 26px) 0 0; padding: 14px 0 0; border-top: 1px solid var(--map-rule); display: flex; flex-wrap: wrap; gap: 8px 28px; color: var(--map-desc); font-size: .92rem; }
+.legend li { display: flex; align-items: center; gap: 10px; }
+.legend svg { width: 34px; height: 26px; flex: none; }
+
+/* trace panel */
+.trace .sign { padding-top: 28px; }
+.trace .sign h2 { font-size: clamp(1.4rem, 2.4vw, 1.9rem); }
+.tcontrols { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; padding: 16px 18px 4px; }
+.tcontrols .tool { padding: 0 13px; }
+.tcontrols .group { flex-wrap: nowrap; gap: 8px; }
+.tsec { padding: 14px 18px 0; }
+.tsec:last-child { padding-bottom: 18px; }
+.tsec h3 { margin: 0 0 6px; font-size: .9rem; font-weight: 500; color: var(--map-hint); }
+.now .chip { display: inline-block; font-weight: 700; font-size: .8rem; padding: 2px 8px; border-radius: 999px; background: var(--c); color: #fff; margin-right: 8px; vertical-align: 1px; }
+.now code { font-family: var(--mono); font-size: .9rem; overflow-wrap: anywhere; }
+.now p { margin: 6px 0 0; font-size: 1rem; line-height: 1.4; }
+.tparts { margin: 8px 0 0; display: flex; flex-direction: column; gap: 4px; font-family: var(--mono); font-size: .86rem; }
+.tparts div { overflow-wrap: anywhere; }
+.tparts .arrow { color: var(--map-hint); padding: 0 .3em; font-family: var(--font); }
+.tparts .v { font-weight: 700; }
+.tparts .skip { color: var(--map-hint); }
+.tparts .op { color: var(--map-hint); font-family: var(--font); font-weight: 700; }
+.vars { margin: 0; display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 3px 16px; font-family: var(--mono); font-size: .92rem; }
+.vars dt { color: var(--map-hint); }
+.vars dd { margin: 0; font-weight: 700; overflow-wrap: anywhere; justify-self: start; padding: 0 .25em; border-radius: .2em; }
+.vars dd.chg { animation: chg 1s ease; }
+@keyframes chg { 0%, 35% { background: var(--map-ink); color: var(--map-bg); } 100% { background: transparent; color: var(--map-ink); } }
+.none { color: var(--map-hint); font-size: .92rem; margin: 0; font-family: var(--font); }
+.outbox { margin: 0; font-family: var(--mono); font-size: .88rem; line-height: 1.45; background: var(--map-box); border-radius: 8px; padding: 10px 12px; min-height: 3.2em; max-height: 12em; overflow: auto; white-space: pre; }
+.final { margin: 0; font-family: var(--mono); font-size: .95rem; line-height: 1.5; border: 2px dashed var(--map-rule); border-radius: 8px; padding: 12px 14px; min-height: 4.2em; overflow: auto; white-space: pre; color: var(--map-hint); font-weight: 400; }
+.final.done { border: 2px solid var(--c); color: var(--map-ink); font-weight: 700; }
+.final .none { white-space: normal; }
+
+/* pocket map */
+.pocket { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.card { min-width: 0; border-right: 1px solid var(--map-rule); border-bottom: 1px solid var(--map-rule); }
+.card:nth-child(4n) { border-right: 0; }
+.card .sign { padding: 22px 16px 12px; gap: 10px; }
+.card .sign::before { top: 8px; }
+.card .sign .bullet { font-size: 1rem; }
+.card .sign b { font-size: 1.1rem; }
+.card .sign span.n { color: #BDBDBD; font-size: .88rem; }
+.card svg { display: block; max-width: calc(100% - 32px); height: auto; margin: 14px 16px 18px; }
+
+/* svg pieces */
+.code-text { font-family: var(--mono); fill: var(--map-ink); font-weight: 500; }
+.code-text .kw { font-weight: 700; }
+.code-text .ph { font-style: italic; fill: var(--map-ph); font-weight: 400; }
+.hint { font-family: var(--font); fill: var(--map-hint); font-weight: 500; }
+.bul-text { font-family: var(--font); font-weight: 700; fill: #fff; }
+.bul-ring, .casing { stroke: var(--map-bg); }
+.st-stop, .lg-stop { fill: var(--map-ink); }
+.st-test, .lg-test { fill: var(--map-bg); stroke: var(--map-ink); }
+.band { fill: var(--map-band); opacity: 0; transition: opacity .18s; }
+.band.hover { opacity: 1; }
+.runband { opacity: 0; transition: opacity .25s; }
+.runband.ran { opacity: .17; }
+.runband.now { opacity: .5; }
+.base { transition: opacity .3s; }
+.tracing .base { opacity: .28; }
+.blankbar { fill: var(--map-blank); cursor: pointer; }
+.blankbar:hover { fill: var(--map-blank-hover); }
+.hidden-code .row:not(.revealed) .code-text { opacity: 0; }
+.row.revealed .blankbar, body:not(.recall) .blankbar { display: none; }
+
+@media (max-width: 1100px) {
+  .pocket { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .card:nth-child(4n) { border-right: 1px solid var(--map-rule); }
+  .card:nth-child(2n) { border-right: 0; }
+}
+@media (max-width: 760px) {
+  .layout { grid-template-columns: minmax(0, 1fr); }
+  .routes { position: static; flex-direction: row; overflow-x: auto; padding-bottom: 4px; }
+  .routebtn { width: auto; flex: none; }
+  .routebtn small { display: none; }
+  .pocket { grid-template-columns: minmax(0, 1fr); }
+  .card { border-right: 0 !important; }
+}
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; animation: none !important; } }
+@media print {
+  html, body { background: #FFFFFF; }
+  .station, .routes, .controls, .legend, .trace { display: none; }
+  .layout { display: block; margin: 0; }
+  .wrap { max-width: none; padding: 0; }
+  .theme { border-color: transparent; --map-bg: #FFFFFF; --map-ink: #111111; --map-ph: #6D6E71; --map-hint: #555555; --map-desc: #333333; --map-band: #EEEEEE; --map-blank: #DADADA; --map-rule: #DDDDDD; }
+  .pocket { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .card { break-inside: avoid; }
+  .sign { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}
+</style>
+</head>
+<body>
+<header class="station">
+  <div class="wrap head">
+    <h1>The shape of control flow</h1>
+    <svg class="logo" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1547.89 170" role="img" aria-label="Imperial College London"><path fill="currentColor" d="M 641.87 0.00 L 641.87 169.99 L 752.36 169.99 L 752.36 140.24 L 674.16 140.24 L 674.16 97.75 L 745.56 97.75 L 745.56 68.85 L 674.16 68.85 L 674.16 29.75 L 752.36 29.75 L 752.36 0.00 L 641.87 0.00 M 509.30 112.19 L 483.81 112.19 L 483.81 169.99 L 451.51 169.99 L 451.51 0.00 L 509.30 0.00 C 545.55 0.00 573.90 16.42 573.90 56.10 C 573.90 95.19 545.34 112.19 509.30 112.19 M 507.60 27.46 L 483.81 27.46 L 483.81 84.74 L 507.60 84.74 C 526.22 84.74 539.90 75.73 539.90 56.10 C 539.90 35.70 526.22 27.46 507.60 27.46 M 1032.85 0.00 L 1032.85 29.75 L 1072.80 29.75 L 1072.80 140.24 L 1032.85 140.24 L 1032.85 169.99 L 1145.04 169.99 L 1145.04 140.24 L 1105.10 140.24 L 1105.10 29.75 L 1145.04 29.75 L 1145.04 0.00 L 1032.85 0.00 M 958.49 52.70 C 958.49 13.02 931.30 0.00 895.60 0.00 L 832.70 0.00 L 832.70 169.99 L 865.00 169.99 L 865.00 107.09 L 892.20 107.09 C 893.69 107.09 895.17 107.07 896.64 107.01 L 929.55 169.99 L 965.33 169.99 L 928.82 100.28 C 946.58 92.38 958.49 77.22 958.49 52.70 M 924.5 52.70 C 924.5 73.18 912.60 79.64 892.20 79.64 L 865.00 79.64 L 865.00 27.46 L 892.20 27.46 C 914.33 27.46 924.5 35.70 924.5 52.70 M 1265.5 0.00 L 1209.40 169.99 L 1243.40 169.99 L 1254.99 132.59 L 1318.50 132.59 L 1330.09 169.99 L 1364.09 169.99 L 1307.99 0.00 Z M 1286.75 30.16 L 1309.98 105.14 L 1263.5 105.14 Z M 1286.75 30.16 M 1437.00 0.00 L 1437.00 169.99 L 1547.78 169.99 L 1547.78 140.24 L 1469.30 140.24 L 1469.30 0.00 L 1437.00 0.00 M 323.44 0.00 L 282.65 99.96 L 241.85 0.00 L 195.95 0.00 L 195.95 169.99 L 226.55 169.99 L 226.55 42.90 L 265.65 132.59 L 299.64 132.59 L 338.74 42.90 L 338.74 169.99 L 369.34 169.99 L 369.34 0.00 L 323.44 0.00 M 0 0.00 L 0 29.75 L 39.94 29.75 L 39.94 140.24 L 0 140.24 L 0 169.99 L 112.19 169.99 L 112.19 140.24 L 72.24 140.24 L 72.24 29.75 L 112.19 29.75 L 112.19 0.00 L 0 0.00"/></svg>
+  </div>
+</header>
+
+<div class="wrap layout">
+  <nav class="routes" id="routes" aria-label="Choose a shape"></nav>
+
+  <main>
+    <div class="controls">
+      <div class="seg" role="group" aria-label="Labels">
+        <button type="button" id="skel" aria-pressed="true">Skeleton</button>
+        <button type="button" id="ex" aria-pressed="false">Example</button>
+      </div>
+      <button class="tool" type="button" id="recall" aria-pressed="false">Hide the code</button>
+      <div class="seg" role="group" aria-label="View">
+        <button type="button" id="viewOne" aria-pressed="true">One line</button>
+        <button type="button" id="viewAll" aria-pressed="false">Pocket map</button>
+      </div>
+      <div class="seg" role="group" aria-label="Background">
+        <button type="button" id="bgBlack" aria-pressed="true">Black</button>
+        <button type="button" id="bgWhite" aria-pressed="false">White</button>
+      </div>
+    </div>
+
+    <div class="stage" id="stage">
+      <section class="theme" id="mapOne">
+        <div class="sign">
+          <span class="bullet" id="headBullet" aria-hidden="true"></span>
+          <h2 id="headName"></h2>
+          <span class="nick" id="headNick"></span>
+        </div>
+        <div class="body">
+          <p class="desc" id="headDesc"></p>
+          <div class="figure" id="figure"></div>
+          <ul class="legend">
+            <li><svg viewBox="0 0 34 26" aria-hidden="true"><rect x="14" y="0" width="6" height="26" fill="#8A8A8A"/><circle class="lg-stop" cx="17" cy="13" r="4.6"/></svg>A statement: every train that passes stops here</li>
+            <li><svg viewBox="0 0 34 26" aria-hidden="true"><rect x="14" y="0" width="6" height="26" fill="#8A8A8A"/><circle class="lg-test" cx="17" cy="13" r="6.5" stroke-width="2.4"/></svg>A test: True turns right, False carries straight on</li>
+            <li><svg viewBox="0 0 34 26" aria-hidden="true"><rect x="14" y="0" width="6" height="26" fill="#8A8A8A"/><path d="M14.6 15.5l2.4-3.2 2.4 3.2" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>Direction of travel</li>
+            <li><svg viewBox="0 0 34 26" aria-hidden="true"><circle cx="17" cy="13" r="11" fill="#8A8A8A"/><text x="17" y="17.5" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-weight="700" font-size="13" fill="#fff">1</text></svg>Route bullet: press its key to jump to it</li>
+          </ul>
+        </div>
+      </section>
+
+      <aside class="theme trace" id="trace" aria-label="Trace">
+        <div class="sign"><h2>Trace</h2></div>
+        <div class="tcontrols">
+          <div class="seg" role="group" aria-label="Example input" id="scenarios"></div>
+          <div class="group">
+            <button class="tool main" type="button" id="run"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path id="runIcon" d="M7 4.5v15l13-7.5z"/></svg><span id="runText">Run</span></button>
+            <button class="tool" type="button" id="step">Step</button>
+            <button class="tool" type="button" id="reset">Reset</button>
+          </div>
+          <div class="seg" role="group" aria-label="Speed">
+            <button type="button" id="slow" aria-pressed="true">Slow</button>
+            <button type="button" id="fast" aria-pressed="false">Fast</button>
+          </div>
+        </div>
+        <section class="tsec"><h3>What’s happening</h3><div class="now" id="now" aria-live="polite"></div></section>
+        <section class="tsec"><h3>Variables</h3><dl class="vars" id="vars"></dl></section>
+        <section class="tsec"><h3>Output so far</h3><pre class="outbox" id="soFar"></pre></section>
+        <section class="tsec"><h3>Final output</h3><pre class="final" id="final"></pre></section>
+      </aside>
+    </div>
+
+    <section class="theme" id="mapAll" hidden style="margin-top:16px">
+      <div class="sign">
+        <h2>Pocket map</h2>
+        <div class="row-of-bullets" id="allBullets" aria-hidden="true"></div>
+      </div>
+      <div class="pocket" id="pocket"></div>
+    </section>
+  </main>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var TRACES = {"1":[{"label":"310 MPa","code":["stress = 310","if stress > 275:","    print(\"Yield exceeded: redesign\")","print(\"Check complete\")"],"steps":[{"row":0,"vars":{"stress":"310"},"out":0,"say":"Creates stress = 310.","changed":["stress"]},{"row":1,"vars":{"stress":"310"},"out":0,"test":{"parts":[{"src":"stress > 275","val":"True","truth":true,"sub":"310 > 275"}],"truth":true},"say":"True, so the train turns right into the body."},{"row":2,"vars":{"stress":"310"},"out":25,"say":"Prints “Yield exceeded: redesign”."},{"row":3,"vars":{"stress":"310"},"out":40,"say":"Prints “Check complete”."}],"output":"Yield exceeded: redesign\nCheck complete\n"},{"label":"180 MPa","code":["stress = 180","if stress > 275:","    print(\"Yield exceeded: redesign\")","print(\"Check complete\")"],"steps":[{"row":0,"vars":{"stress":"180"},"out":0,"say":"Creates stress = 180.","changed":["stress"]},{"row":1,"vars":{"stress":"180"},"out":0,"test":{"parts":[{"src":"stress > 275","val":"False","truth":false,"sub":"180 > 275"}],"truth":false},"say":"False, so the train carries straight on, past the body."},{"row":3,"vars":{"stress":"180"},"out":15,"say":"Prints “Check complete”."}],"output":"Check complete\n"}],"2":[{"label":"Mach 1.4","code":["mach = 1.4","if mach > 1:","    regime = \"supersonic\"","else:","    regime = \"subsonic\"","print(\"Flight is\", regime)"],"steps":[{"row":0,"vars":{"mach":"1.4"},"out":0,"say":"Creates mach = 1.4.","changed":["mach"]},{"row":1,"vars":{"mach":"1.4"},"out":0,"test":{"parts":[{"src":"mach > 1","val":"True","truth":true,"sub":"1.4 > 1"}],"truth":true},"say":"True, so the train turns right into the body."},{"row":2,"vars":{"mach":"1.4","regime":"'supersonic'"},"out":0,"say":"Creates regime = 'supersonic'.","changed":["regime"]},{"row":5,"vars":{"mach":"1.4","regime":"'supersonic'"},"out":21,"say":"Prints “Flight is supersonic”."}],"output":"Flight is supersonic\n"},{"label":"Mach 0.8","code":["mach = 0.8","if mach > 1:","    regime = \"supersonic\"","else:","    regime = \"subsonic\"","print(\"Flight is\", regime)"],"steps":[{"row":0,"vars":{"mach":"0.8"},"out":0,"say":"Creates mach = 0.8.","changed":["mach"]},{"row":1,"vars":{"mach":"0.8"},"out":0,"test":{"parts":[{"src":"mach > 1","val":"False","truth":false,"sub":"0.8 > 1"}],"truth":false},"say":"False, so the train carries straight on to the else body."},{"row":4,"vars":{"mach":"0.8","regime":"'subsonic'"},"out":0,"say":"Creates regime = 'subsonic'.","changed":["regime"]},{"row":5,"vars":{"mach":"0.8","regime":"'subsonic'"},"out":19,"say":"Prints “Flight is subsonic”."}],"output":"Flight is subsonic\n"}],"3":[{"label":"Re 1500","code":["Re = 1500","if Re < 2300:","    regime = \"laminar\"","elif Re < 4000:","    regime = \"transitional\"","else:","    regime = \"turbulent\"","print(\"Flow is\", regime)"],"steps":[{"row":0,"vars":{"Re":"1500"},"out":0,"say":"Creates Re = 1500.","changed":["Re"]},{"row":1,"vars":{"Re":"1500"},"out":0,"test":{"parts":[{"src":"Re < 2300","val":"True","truth":true,"sub":"1500 < 2300"}],"truth":true},"say":"True, so the train turns right into the body."},{"row":2,"vars":{"Re":"1500","regime":"'laminar'"},"out":0,"say":"Creates regime = 'laminar'.","changed":["regime"]},{"row":7,"vars":{"Re":"1500","regime":"'laminar'"},"out":16,"say":"Prints “Flow is laminar”."}],"output":"Flow is laminar\n"},{"label":"Re 3000","code":["Re = 3000","if Re < 2300:","    regime = \"laminar\"","elif Re < 4000:","    regime = \"transitional\"","else:","    regime = \"turbulent\"","print(\"Flow is\", regime)"],"steps":[{"row":0,"vars":{"Re":"3000"},"out":0,"say":"Creates Re = 3000.","changed":["Re"]},{"row":1,"vars":{"Re":"3000"},"out":0,"test":{"parts":[{"src":"Re < 2300","val":"False","truth":false,"sub":"3000 < 2300"}],"truth":false},"say":"False, so the train carries straight on to the next test."},{"row":3,"vars":{"Re":"3000"},"out":0,"test":{"parts":[{"src":"Re < 4000","val":"True","truth":true,"sub":"3000 < 4000"}],"truth":true},"say":"True, so the train turns right into the body."},{"row":4,"vars":{"Re":"3000","regime":"'transitional'"},"out":0,"say":"Creates regime = 'transitional'.","changed":["regime"]},{"row":7,"vars":{"Re":"3000","regime":"'transitional'"},"out":21,"say":"Prints “Flow is transitional”."}],"output":"Flow is transitional\n"},{"label":"Re 10000","code":["Re = 10000","if Re < 2300:","    regime = \"laminar\"","elif Re < 4000:","    regime = \"transitional\"","else:","    regime = \"turbulent\"","print(\"Flow is\", regime)"],"steps":[{"row":0,"vars":{"Re":"10000"},"out":0,"say":"Creates Re = 10000.","changed":["Re"]},{"row":1,"vars":{"Re":"10000"},"out":0,"test":{"parts":[{"src":"Re < 2300","val":"False","truth":false,"sub":"10000 < 2300"}],"truth":false},"say":"False, so the train carries straight on to the next test."},{"row":3,"vars":{"Re":"10000"},"out":0,"test":{"parts":[{"src":"Re < 4000","val":"False","truth":false,"sub":"10000 < 4000"}],"truth":false},"say":"False, so the train carries straight on to the else body."},{"row":6,"vars":{"Re":"10000","regime":"'turbulent'"},"out":0,"say":"Creates regime = 'turbulent'.","changed":["regime"]},{"row":7,"vars":{"Re":"10000","regime":"'turbulent'"},"out":18,"say":"Prints “Flow is turbulent”."}],"output":"Flow is turbulent\n"}],"N":[{"label":"42 kN","code":["reading = 42","if reading is not None:","    if reading > 50:","        print(\"Overloaded\")","    else:","        print(\"Within limits\")","print(\"Check complete\")"],"steps":[{"row":0,"vars":{"reading":"42"},"out":0,"say":"Creates reading = 42.","changed":["reading"]},{"row":1,"vars":{"reading":"42"},"out":0,"test":{"parts":[{"src":"reading is not None","val":"True","truth":true,"sub":"42 is not None"}],"truth":true},"say":"True, so the train turns right into the body."},{"row":2,"vars":{"reading":"42"},"out":0,"test":{"parts":[{"src":"reading > 50","val":"False","truth":false,"sub":"42 > 50"}],"truth":false},"say":"False, so the train carries straight on to the else body."},{"row":5,"vars":{"reading":"42"},"out":14,"say":"Prints “Within limits”."},{"row":6,"vars":{"reading":"42"},"out":29,"say":"Prints “Check complete”."}],"output":"Within limits\nCheck complete\n"},{"label":"63 kN","code":["reading = 63","if reading is not None:","    if reading > 50:","        print(\"Overloaded\")","    else:","        print(\"Within limits\")","print(\"Check complete\")"],"steps":[{"row":0,"vars":{"reading":"63"},"out":0,"say":"Creates reading = 63.","changed":["reading"]},{"row":1,"vars":{"reading":"63"},"out":0,"test":{"parts":[{"src":"reading is not None","val":"True","truth":true,"sub":"63 is not None"}],"truth":true},"say":"True, so the train turns right into the body."},{"row":2,"vars":{"reading":"63"},"out":0,"test":{"parts":[{"src":"reading > 50","val":"True","truth":true,"sub":"63 > 50"}],"truth":true},"say":"True, so the train turns right into the body."},{"row":3,"vars":{"reading":"63"},"out":11,"say":"Prints “Overloaded”."},{"row":6,"vars":{"reading":"63"},"out":26,"say":"Prints “Check complete”."}],"output":"Overloaded\nCheck complete\n"},{"label":"No reading","code":["reading = None","if reading is not None:","    if reading > 50:","        print(\"Overloaded\")","    else:","        print(\"Within limits\")","print(\"Check complete\")"],"steps":[{"row":0,"vars":{"reading":"None"},"out":0,"say":"Creates reading = None.","changed":["reading"]},{"row":1,"vars":{"reading":"None"},"out":0,"test":{"parts":[{"src":"reading is not None","val":"False","truth":false,"sub":"None is not None"}],"truth":false},"say":"False, so the train carries straight on, past the body."},{"row":6,"vars":{"reading":"None"},"out":15,"say":"Prints “Check complete”."}],"output":"Check complete\n"}],"4":[{"label":"From 2 m","code":["height = 2.0","while height > 0.3:","    print(\"Bounce:\", height, \"m\")","    height = height / 2","print(\"Ball at rest\")"],"steps":[{"row":0,"vars":{"height":"2.0"},"out":0,"say":"Creates height = 2.0.","changed":["height"]},{"row":1,"vars":{"height":"2.0"},"out":0,"test":{"parts":[{"src":"height > 0.3","val":"True","truth":true,"sub":"2.0 > 0.3"}],"truth":true},"say":"True, so the train turns right into the loop."},{"row":2,"vars":{"height":"2.0"},"out":14,"say":"Prints “Bounce: 2.0 m”."},{"row":3,"vars":{"height":"1.0"},"out":14,"say":"height is now 1.0.","changed":["height"]},{"row":1,"vars":{"height":"1.0"},"out":14,"test":{"parts":[{"src":"height > 0.3","val":"True","truth":true,"sub":"1.0 > 0.3"}],"truth":true},"say":"True, so the train turns right into the loop."},{"row":2,"vars":{"height":"1.0"},"out":28,"say":"Prints “Bounce: 1.0 m”."},{"row":3,"vars":{"height":"0.5"},"out":28,"say":"height is now 0.5.","changed":["height"]},{"row":1,"vars":{"height":"0.5"},"out":28,"test":{"parts":[{"src":"height > 0.3","val":"True","truth":true,"sub":"0.5 > 0.3"}],"truth":true},"say":"True, so the train turns right into the loop."},{"row":2,"vars":{"height":"0.5"},"out":42,"say":"Prints “Bounce: 0.5 m”."},{"row":3,"vars":{"height":"0.25"},"out":42,"say":"height is now 0.25.","changed":["height"]},{"row":1,"vars":{"height":"0.25"},"out":42,"test":{"parts":[{"src":"height > 0.3","val":"False","truth":false,"sub":"0.25 > 0.3"}],"truth":false},"say":"False, so the train carries straight on and leaves the loop."},{"row":4,"vars":{"height":"0.25"},"out":55,"say":"Prints “Ball at rest”."}],"output":"Bounce: 2.0 m\nBounce: 1.0 m\nBounce: 0.5 m\nBall at rest\n"},{"label":"From 0.2 m","code":["height = 0.2","while height > 0.3:","    print(\"Bounce:\", height, \"m\")","    height = height / 2","print(\"Ball at rest\")"],"steps":[{"row":0,"vars":{"height":"0.2"},"out":0,"say":"Creates height = 0.2.","changed":["height"]},{"row":1,"vars":{"height":"0.2"},"out":0,"test":{"parts":[{"src":"height > 0.3","val":"False","truth":false,"sub":"0.2 > 0.3"}],"truth":false},"say":"False, so the train carries straight on and leaves the loop."},{"row":4,"vars":{"height":"0.2"},"out":13,"say":"Prints “Ball at rest”."}],"output":"Ball at rest\n"}],"5":[{"label":"Three loads","code":["total = 0","for load in [12, 7, 21]:","    total += load","print(\"Total load:\", total, \"kN\")"],"steps":[{"row":0,"vars":{"total":"0"},"out":0,"say":"Creates total = 0.","changed":["total"]},{"row":1,"vars":{"total":"0","load":"12"},"out":0,"say":"Takes the next item: load = 12. The train turns right into the loop.","changed":["load"],"take":{"target":"load","iter":"[12, 7, 21]","value":"12"}},{"row":2,"vars":{"total":"12","load":"12"},"out":0,"say":"total is now 12, which is 0 + 12.","changed":["total"]},{"row":1,"vars":{"total":"12","load":"7"},"out":0,"say":"Takes the next item: load = 7. The train turns right into the loop.","changed":["load"],"take":{"target":"load","iter":"[12, 7, 21]","value":"7"}},{"row":2,"vars":{"total":"19","load":"7"},"out":0,"say":"total is now 19, which is 12 + 7.","changed":["total"]},{"row":1,"vars":{"total":"19","load":"21"},"out":0,"say":"Takes the next item: load = 21. The train turns right into the loop.","changed":["load"],"take":{"target":"load","iter":"[12, 7, 21]","value":"21"}},{"row":2,"vars":{"total":"40","load":"21"},"out":0,"say":"total is now 40, which is 19 + 21.","changed":["total"]},{"row":1,"vars":{"total":"40","load":"21"},"out":0,"say":"Nothing left in [12, 7, 21], so the train carries straight on and leaves the loop.","take":{"target":"load","iter":"[12, 7, 21]","value":null}},{"row":3,"vars":{"total":"40","load":"21"},"out":18,"say":"Prints “Total load: 40 kN”."}],"output":"Total load: 40 kN\n"},{"label":"No loads","code":["total = 0","for load in []:","    total += load","print(\"Total load:\", total, \"kN\")"],"steps":[{"row":0,"vars":{"total":"0"},"out":0,"say":"Creates total = 0.","changed":["total"]},{"row":1,"vars":{"total":"0"},"out":0,"say":"Nothing left in [], so the train carries straight on and leaves the loop.","take":{"target":"load","iter":"[]","value":null}},{"row":3,"vars":{"total":"0"},"out":17,"say":"Prints “Total load: 0 kN”."}],"output":"Total load: 0 kN\n"}],"6":[{"label":"2 × 3 table","code":["for i in range(1, 3):","    for j in range(1, 4):","        print(i * j, end=\" \")","    print()","print(\"Table done\")"],"steps":[{"row":0,"vars":{"i":"1"},"out":0,"say":"Takes the next item: i = 1. The train turns right into the loop.","changed":["i"],"take":{"target":"i","iter":"range(1, 3)","value":"1"}},{"row":1,"vars":{"i":"1","j":"1"},"out":0,"say":"Takes the next item: j = 1. The train turns right into the loop.","changed":["j"],"take":{"target":"j","iter":"range(1, 4)","value":"1"}},{"row":2,"vars":{"i":"1","j":"1"},"out":2,"say":"Prints “1 ” and stays on the same line."},{"row":1,"vars":{"i":"1","j":"2"},"out":2,"say":"Takes the next item: j = 2. The train turns right into the loop.","changed":["j"],"take":{"target":"j","iter":"range(1, 4)","value":"2"}},{"row":2,"vars":{"i":"1","j":"2"},"out":4,"say":"Prints “2 ” and stays on the same line."},{"row":1,"vars":{"i":"1","j":"3"},"out":4,"say":"Takes the next item: j = 3. The train turns right into the loop.","changed":["j"],"take":{"target":"j","iter":"range(1, 4)","value":"3"}},{"row":2,"vars":{"i":"1","j":"3"},"out":6,"say":"Prints “3 ” and stays on the same line."},{"row":1,"vars":{"i":"1","j":"3"},"out":6,"say":"Nothing left in range(1, 4), so the train carries straight on and leaves the loop.","take":{"target":"j","iter":"range(1, 4)","value":null}},{"row":3,"vars":{"i":"1","j":"3"},"out":7,"say":"Prints a new line."},{"row":0,"vars":{"i":"2","j":"3"},"out":7,"say":"Takes the next item: i = 2. The train turns right into the loop.","changed":["i"],"take":{"target":"i","iter":"range(1, 3)","value":"2"}},{"row":1,"vars":{"i":"2","j":"1"},"out":7,"say":"Takes the next item: j = 1. The train turns right into the loop.","changed":["j"],"take":{"target":"j","iter":"range(1, 4)","value":"1"}},{"row":2,"vars":{"i":"2","j":"1"},"out":9,"say":"Prints “2 ” and stays on the same line."},{"row":1,"vars":{"i":"2","j":"2"},"out":9,"say":"Takes the next item: j = 2. The train turns right into the loop.","changed":["j"],"take":{"target":"j","iter":"range(1, 4)","value":"2"}},{"row":2,"vars":{"i":"2","j":"2"},"out":11,"say":"Prints “4 ” and stays on the same line."},{"row":1,"vars":{"i":"2","j":"3"},"out":11,"say":"Takes the next item: j = 3. The train turns right into the loop.","changed":["j"],"take":{"target":"j","iter":"range(1, 4)","value":"3"}},{"row":2,"vars":{"i":"2","j":"3"},"out":13,"say":"Prints “6 ” and stays on the same line."},{"row":1,"vars":{"i":"2","j":"3"},"out":13,"say":"Nothing left in range(1, 4), so the train carries straight on and leaves the loop.","take":{"target":"j","iter":"range(1, 4)","value":null}},{"row":3,"vars":{"i":"2","j":"3"},"out":14,"say":"Prints a new line."},{"row":0,"vars":{"i":"2","j":"3"},"out":14,"say":"Nothing left in range(1, 3), so the train carries straight on and leaves the loop.","take":{"target":"i","iter":"range(1, 3)","value":null}},{"row":4,"vars":{"i":"2","j":"3"},"out":25,"say":"Prints “Table done”."}],"output":"1 2 3 \n2 4 6 \nTable done\n"}],"7":[{"label":"Limit 10","code":["x = 1.0","steps = 0","while abs(x * x - 2) > 1e-9 and steps < 10:","    x = (x + 2 / x) / 2","    steps += 1","if steps == 10:","    print(\"Gave up after\", steps, \"steps\")","print(\"√2 ≈\", x)"],"steps":[{"row":0,"vars":{"x":"1.0"},"out":0,"say":"Creates x = 1.0.","changed":["x"]},{"row":1,"vars":{"x":"1.0","steps":"0"},"out":0,"say":"Creates steps = 0.","changed":["steps"]},{"row":2,"vars":{"x":"1.0","steps":"0"},"out":0,"test":{"op":"and","parts":[{"src":"abs(x * x - 2) > 1e-9","val":"True","truth":true,"sub":"abs(1.0 * 1.0 - 2) > 1e-9"},{"src":"steps < 10","val":"True","truth":true,"sub":"0 < 10"}],"truth":true},"say":"True, so the train turns right into the loop."},{"row":3,"vars":{"x":"1.5","steps":"0"},"out":0,"say":"x is now 1.5.","changed":["x"]},{"row":4,"vars":{"x":"1.5","steps":"1"},"out":0,"say":"steps is now 1, which is 0 + 1.","changed":["steps"]},{"row":2,"vars":{"x":"1.5","steps":"1"},"out":0,"test":{"op":"and","parts":[{"src":"abs(x * x - 2) > 1e-9","val":"True","truth":true,"sub":"abs(1.5 * 1.5 - 2) > 1e-9"},{"src":"steps < 10","val":"True","truth":true,"sub":"1 < 10"}],"truth":true},"say":"True, so the train turns right into the loop."},{"row":3,"vars":{"x":"1.4166666666666665","steps":"1"},"out":0,"say":"x is now 1.4166666666666665.","changed":["x"]},{"row":4,"vars":{"x":"1.4166666666666665","steps":"2"},"out":0,"say":"steps is now 2, which is 1 + 1.","changed":["steps"]},{"row":2,"vars":{"x":"1.4166666666666665","steps":"2"},"out":0,"test":{"op":"and","parts":[{"src":"abs(x * x - 2) > 1e-9","val":"True","truth":true,"sub":"abs(1.4166666666666665 * 1.4166666666666665 - 2) > 1e-9"},{"src":"steps < 10","val":"True","truth":true,"sub":"2 < 10"}],"truth":true},"say":"True, so the train turns right into the loop."},{"row":3,"vars":{"x":"1.4142156862745097","steps":"2"},"out":0,"say":"x is now 1.4142156862745097.","changed":["x"]},{"row":4,"vars":{"x":"1.4142156862745097","steps":"3"},"out":0,"say":"steps is now 3, which is 2 + 1.","changed":["steps"]},{"row":2,"vars":{"x":"1.4142156862745097","steps":"3"},"out":0,"test":{"op":"and","parts":[{"src":"abs(x * x - 2) > 1e-9","val":"True","truth":true,"sub":"abs(1.4142156862745097 * 1.4142156862745097 - 2) > 1e-9"},{"src":"steps < 10","val":"True","truth":true,"sub":"3 < 10"}],"truth":true},"say":"True, so the train turns right into the loop."},{"row":3,"vars":{"x":"1.4142135623746899","steps":"3"},"out":0,"say":"x is now 1.4142135623746899.","changed":["x"]},{"row":4,"vars":{"x":"1.4142135623746899","steps":"4"},"out":0,"say":"steps is now 4, which is 3 + 1.","changed":["steps"]},{"row":2,"vars":{"x":"1.4142135623746899","steps":"4"},"out":0,"test":{"op":"and","parts":[{"src":"abs(x * x - 2) > 1e-9","val":"False","truth":false,"sub":"abs(1.4142135623746899 * 1.4142135623746899 - 2) > 1e-9"},{"src":"steps < 10","skipped":true}],"truth":false},"say":"False, so the train carries straight on and leaves the loop."},{"row":5,"vars":{"x":"1.4142135623746899","steps":"4"},"out":0,"test":{"parts":[{"src":"steps == 10","val":"False","truth":false,"sub":"4 == 10"}],"truth":false},"say":"False, so the train carries straight on, past the body."},{"row":7,"vars":{"x":"1.4142135623746899","steps":"4"},"out":24,"say":"Prints “√2 ≈ 1.4142135623746899”."}],"output":"√2 ≈ 1.4142135623746899\n"},{"label":"Limit 3","code":["x = 1.0","steps = 0","while abs(x * x - 2) > 1e-9 and steps < 3:","    x = (x + 2 / x) / 2","    steps += 1","if steps == 3:","    print(\"Gave up after\", steps, \"steps\")","print(\"√2 ≈\", x)"],"steps":[{"row":0,"vars":{"x":"1.0"},"out":0,"say":"Creates x = 1.0.","changed":["x"]},{"row":1,"vars":{"x":"1.0","steps":"0"},"out":0,"say":"Creates steps = 0.","changed":["steps"]},{"row":2,"vars":{"x":"1.0","steps":"0"},"out":0,"test":{"op":"and","parts":[{"src":"abs(x * x - 2) > 1e-9","val":"True","truth":true,"sub":"abs(1.0 * 1.0 - 2) > 1e-9"},{"src":"steps < 3","val":"True","truth":true,"sub":"0 < 3"}],"truth":true},"say":"True, so the train turns right into the loop."},{"row":3,"vars":{"x":"1.5","steps":"0"},"out":0,"say":"x is now 1.5.","changed":["x"]},{"row":4,"vars":{"x":"1.5","steps":"1"},"out":0,"say":"steps is now 1, which is 0 + 1.","changed":["steps"]},{"row":2,"vars":{"x":"1.5","steps":"1"},"out":0,"test":{"op":"and","parts":[{"src":"abs(x * x - 2) > 1e-9","val":"True","truth":true,"sub":"abs(1.5 * 1.5 - 2) > 1e-9"},{"src":"steps < 3","val":"True","truth":true,"sub":"1 < 3"}],"truth":true},"say":"True, so the train turns right into the loop."},{"row":3,"vars":{"x":"1.4166666666666665","steps":"1"},"out":0,"say":"x is now 1.4166666666666665.","changed":["x"]},{"row":4,"vars":{"x":"1.4166666666666665","steps":"2"},"out":0,"say":"steps is now 2, which is 1 + 1.","changed":["steps"]},{"row":2,"vars":{"x":"1.4166666666666665","steps":"2"},"out":0,"test":{"op":"and","parts":[{"src":"abs(x * x - 2) > 1e-9","val":"True","truth":true,"sub":"abs(1.4166666666666665 * 1.4166666666666665 - 2) > 1e-9"},{"src":"steps < 3","val":"True","truth":true,"sub":"2 < 3"}],"truth":true},"say":"True, so the train turns right into the loop."},{"row":3,"vars":{"x":"1.4142156862745097","steps":"2"},"out":0,"say":"x is now 1.4142156862745097.","changed":["x"]},{"row":4,"vars":{"x":"1.4142156862745097","steps":"3"},"out":0,"say":"steps is now 3, which is 2 + 1.","changed":["steps"]},{"row":2,"vars":{"x":"1.4142156862745097","steps":"3"},"out":0,"test":{"op":"and","parts":[{"src":"abs(x * x - 2) > 1e-9","val":"True","truth":true,"sub":"abs(1.4142156862745097 * 1.4142156862745097 - 2) > 1e-9"},{"src":"steps < 3","val":"False","truth":false,"sub":"3 < 3"}],"truth":false},"say":"False, so the train carries straight on and leaves the loop."},{"row":5,"vars":{"x":"1.4142156862745097","steps":"3"},"out":0,"test":{"parts":[{"src":"steps == 3","val":"True","truth":true,"sub":"3 == 3"}],"truth":true},"say":"True, so the train turns right into the body."},{"row":6,"vars":{"x":"1.4142156862745097","steps":"3"},"out":22,"say":"Prints “Gave up after 3 steps”."},{"row":7,"vars":{"x":"1.4142156862745097","steps":"3"},"out":46,"say":"Prints “√2 ≈ 1.4142156862745097”."}],"output":"Gave up after 3 steps\n√2 ≈ 1.4142156862745097\n"}],"B":[{"label":"Overheats","code":["temps = [61, 64, 92, 63]","for t in temps:","    if t > 80:","        break","    print(\"OK:\", t)","print(\"Last reading checked:\", t)"],"steps":[{"row":0,"vars":{"temps":"[61, 64, 92, 63]"},"out":0,"say":"Creates temps = [61, 64, 92, 63].","changed":["temps"]},{"row":1,"vars":{"temps":"[61, 64, 92, 63]","t":"61"},"out":0,"say":"Takes the next item: t = 61. The train turns right into the loop.","changed":["t"],"take":{"target":"t","iter":"temps","value":"61"}},{"row":2,"vars":{"temps":"[61, 64, 92, 63]","t":"61"},"out":0,"test":{"parts":[{"src":"t > 80","val":"False","truth":false,"sub":"61 > 80"}],"truth":false},"say":"False, so the train carries straight on, past the break."},{"row":4,"vars":{"temps":"[61, 64, 92, 63]","t":"61"},"out":7,"say":"Prints “OK: 61”."},{"row":1,"vars":{"temps":"[61, 64, 92, 63]","t":"64"},"out":7,"say":"Takes the next item: t = 64. The train turns right into the loop.","changed":["t"],"take":{"target":"t","iter":"temps","value":"64"}},{"row":2,"vars":{"temps":"[61, 64, 92, 63]","t":"64"},"out":7,"test":{"parts":[{"src":"t > 80","val":"False","truth":false,"sub":"64 > 80"}],"truth":false},"say":"False, so the train carries straight on, past the break."},{"row":4,"vars":{"temps":"[61, 64, 92, 63]","t":"64"},"out":14,"say":"Prints “OK: 64”."},{"row":1,"vars":{"temps":"[61, 64, 92, 63]","t":"92"},"out":14,"say":"Takes the next item: t = 92. The train turns right into the loop.","changed":["t"],"take":{"target":"t","iter":"temps","value":"92"}},{"row":2,"vars":{"temps":"[61, 64, 92, 63]","t":"92"},"out":14,"test":{"parts":[{"src":"t > 80","val":"True","truth":true,"sub":"92 > 80"}],"truth":true},"say":"True, so the train turns right into the body."},{"row":3,"vars":{"temps":"[61, 64, 92, 63]","t":"92"},"out":14,"say":"break: the train takes the emergency exit, straight out of the loop."},{"row":5,"vars":{"temps":"[61, 64, 92, 63]","t":"92"},"out":39,"say":"Prints “Last reading checked: 92”."}],"output":"OK: 61\nOK: 64\nLast reading checked: 92\n"},{"label":"All fine","code":["temps = [61, 64, 63]","for t in temps:","    if t > 80:","        break","    print(\"OK:\", t)","print(\"Last reading checked:\", t)"],"steps":[{"row":0,"vars":{"temps":"[61, 64, 63]"},"out":0,"say":"Creates temps = [61, 64, 63].","changed":["temps"]},{"row":1,"vars":{"temps":"[61, 64, 63]","t":"61"},"out":0,"say":"Takes the next item: t = 61. The train turns right into the loop.","changed":["t"],"take":{"target":"t","iter":"temps","value":"61"}},{"row":2,"vars":{"temps":"[61, 64, 63]","t":"61"},"out":0,"test":{"parts":[{"src":"t > 80","val":"False","truth":false,"sub":"61 > 80"}],"truth":false},"say":"False, so the train carries straight on, past the break."},{"row":4,"vars":{"temps":"[61, 64, 63]","t":"61"},"out":7,"say":"Prints “OK: 61”."},{"row":1,"vars":{"temps":"[61, 64, 63]","t":"64"},"out":7,"say":"Takes the next item: t = 64. The train turns right into the loop.","changed":["t"],"take":{"target":"t","iter":"temps","value":"64"}},{"row":2,"vars":{"temps":"[61, 64, 63]","t":"64"},"out":7,"test":{"parts":[{"src":"t > 80","val":"False","truth":false,"sub":"64 > 80"}],"truth":false},"say":"False, so the train carries straight on, past the break."},{"row":4,"vars":{"temps":"[61, 64, 63]","t":"64"},"out":14,"say":"Prints “OK: 64”."},{"row":1,"vars":{"temps":"[61, 64, 63]","t":"63"},"out":14,"say":"Takes the next item: t = 63. The train turns right into the loop.","changed":["t"],"take":{"target":"t","iter":"temps","value":"63"}},{"row":2,"vars":{"temps":"[61, 64, 63]","t":"63"},"out":14,"test":{"parts":[{"src":"t > 80","val":"False","truth":false,"sub":"63 > 80"}],"truth":false},"say":"False, so the train carries straight on, past the break."},{"row":4,"vars":{"temps":"[61, 64, 63]","t":"63"},"out":21,"say":"Prints “OK: 63”."},{"row":1,"vars":{"temps":"[61, 64, 63]","t":"63"},"out":21,"say":"Nothing left in temps, so the train carries straight on and leaves the loop.","take":{"target":"t","iter":"temps","value":null}},{"row":5,"vars":{"temps":"[61, 64, 63]","t":"63"},"out":46,"say":"Prints “Last reading checked: 63”."}],"output":"OK: 61\nOK: 64\nOK: 63\nLast reading checked: 63\n"}],"C":[{"label":"One missing","code":["flows = [4.2, None, 3.9]","for r in flows:","    if r is None:","        continue","    print(\"Flow:\", r, \"L/s\")","print(\"All readings done\")"],"steps":[{"row":0,"vars":{"flows":"[4.2, None, 3.9]"},"out":0,"say":"Creates flows = [4.2, None, 3.9].","changed":["flows"]},{"row":1,"vars":{"flows":"[4.2, None, 3.9]","r":"4.2"},"out":0,"say":"Takes the next item: r = 4.2. The train turns right into the loop.","changed":["r"],"take":{"target":"r","iter":"flows","value":"4.2"}},{"row":2,"vars":{"flows":"[4.2, None, 3.9]","r":"4.2"},"out":0,"test":{"parts":[{"src":"r is None","val":"False","truth":false,"sub":"4.2 is None"}],"truth":false},"say":"False, so the train carries straight on, past the continue."},{"row":4,"vars":{"flows":"[4.2, None, 3.9]","r":"4.2"},"out":14,"say":"Prints “Flow: 4.2 L/s”."},{"row":1,"vars":{"flows":"[4.2, None, 3.9]","r":"None"},"out":14,"say":"Takes the next item: r = None. The train turns right into the loop.","changed":["r"],"take":{"target":"r","iter":"flows","value":"None"}},{"row":2,"vars":{"flows":"[4.2, None, 3.9]","r":"None"},"out":14,"test":{"parts":[{"src":"r is None","val":"True","truth":true,"sub":"None is None"}],"truth":true},"say":"True, so the train turns right into the body."},{"row":3,"vars":{"flows":"[4.2, None, 3.9]","r":"None"},"out":14,"say":"continue: the train takes the short turn back to the top, skipping the rest of the body."},{"row":1,"vars":{"flows":"[4.2, None, 3.9]","r":"3.9"},"out":14,"say":"Takes the next item: r = 3.9. The train turns right into the loop.","changed":["r"],"take":{"target":"r","iter":"flows","value":"3.9"}},{"row":2,"vars":{"flows":"[4.2, None, 3.9]","r":"3.9"},"out":14,"test":{"parts":[{"src":"r is None","val":"False","truth":false,"sub":"3.9 is None"}],"truth":false},"say":"False, so the train carries straight on, past the continue."},{"row":4,"vars":{"flows":"[4.2, None, 3.9]","r":"3.9"},"out":28,"say":"Prints “Flow: 3.9 L/s”."},{"row":1,"vars":{"flows":"[4.2, None, 3.9]","r":"3.9"},"out":28,"say":"Nothing left in flows, so the train carries straight on and leaves the loop.","take":{"target":"r","iter":"flows","value":null}},{"row":5,"vars":{"flows":"[4.2, None, 3.9]","r":"3.9"},"out":46,"say":"Prints “All readings done”."}],"output":"Flow: 4.2 L/s\nFlow: 3.9 L/s\nAll readings done\n"}]};
+
+  /* ------------------------------------------------------------------
+     Map units: each row of code is 1 unit tall; branches leave at 45
+     degrees. One rule everywhere: True turns right, False carries
+     straight on. Loops are rounded rectangles hung off their test by
+     two legs: the train leaves down-right and comes back from up-right.
+     ------------------------------------------------------------------ */
+  var L = 0.6, RR = 2.4;
+  var RED = "#EE352E", GREEN = "#00933C", LIME = "#6CBE45", PURPLE = "#B933AD", ORANGE = "#FF6319", BLUE = "#1E5BD0";
+
+  function ring(tx, ty, bottom, right) {
+    return [[tx, ty], [tx + L, ty + L], [tx + L, bottom], [right, bottom], [right, ty - L], [tx + L, ty - L], [tx, ty]];
+  }
+  function back(tx, ty, bottom, right) {
+    return [[tx + L, bottom], [right, bottom], [right, ty - L], [tx + L, ty - L]];
+  }
+
+  var SHAPES = [
+    {
+      id: "1", name: "if", nick: "The bypass", color: RED,
+      desc: "One test. True turns right through the body; False carries straight on past it. Both rejoin the line.",
+      skel: ["\u2039set up\u203a", "if \u2039condition\u203a:", "    \u2039body\u203a", "\u2039next\u203a"],
+      rows: [{ y: 0, x: 0, k: "stop" }, { y: 1, x: 0, k: "test" }, { y: 2, x: L, k: "stop" }, { y: 3.6, x: 0, k: "stop" }],
+      tracks: [{ p: [[0, 1], [L, 1 + L], [L, 2.4], [0, 3]] }],
+      edges: { "1>2": [[L, 1 + L]], "2>3": [[L, 2.4], [0, 3]] },
+      labels: [{ x: 0.78, y: 1.52, t: "True" }, { x: -0.22, y: 2.2, t: "False", a: "end" }],
+      chevrons: []
+    },
+    {
+      id: "2", name: "if / else", nick: "The fork", color: RED,
+      desc: "One test, two routes. True turns right through its body; False carries straight on through the else body.",
+      skel: ["\u2039set up\u203a", "if \u2039condition\u203a:", "    \u2039body if True\u203a", "else:", "    \u2039body if False\u203a", "\u2039next\u203a"],
+      rows: [{ y: 0, x: 0, k: "stop" }, { y: 1, x: 0, k: "test" }, { y: 2, x: L, k: "stop" }, { y: 3, k: null }, { y: 4, x: 0, k: "stop" }, { y: 5.6, x: 0, k: "stop" }],
+      tracks: [{ p: [[0, 1], [L, 1 + L], [L, 4.4], [0, 5]] }],
+      edges: { "1>2": [[L, 1 + L]], "2>5": [[L, 4.4], [0, 5]] },
+      labels: [{ x: 0.78, y: 1.52, t: "True" }, { x: -0.22, y: 2.6, t: "False", a: "end" }],
+      chevrons: []
+    },
+    {
+      id: "3", name: "if / elif / else", nick: "The ladder", color: RED,
+      desc: "Tests in order down the line. The first True turns right and skips every test below it. If none is True, the else body runs.",
+      skel: ["\u2039set up\u203a", "if \u2039condition 1\u203a:", "    \u2039body 1\u203a", "elif \u2039condition 2\u203a:", "    \u2039body 2\u203a", "else:", "    \u2039body 3\u203a", "\u2039next\u203a"],
+      rows: [{ y: 0, x: 0, k: "stop" }, { y: 1, x: 0, k: "test" }, { y: 2, x: 1.0, k: "stop" }, { y: 3, x: 0, k: "test" }, { y: 4, x: L, k: "stop" }, { y: 5, k: null }, { y: 6, x: 0, k: "stop" }, { y: 7.6, x: 0, k: "stop" }],
+      tracks: [{ p: [[0, 1], [1.5, 2.5], [1.5, 5.5], [0, 7]] }, { p: [[0, 3], [L, 3 + L], [L, 6.4]] }],
+      edges: { "2>7": [[1.5, 2.5], [1.5, 5.5], [0, 7]], "3>4": [[L, 3 + L]], "4>7": [[L, 6.4], [0, 7]] },
+      labels: [
+        { x: 0.6, y: 1.33, t: "True" }, { x: -0.22, y: 2.1, t: "False", a: "end" },
+        { x: 0.78, y: 3.52, t: "True" }, { x: -0.22, y: 4.1, t: "False", a: "end" }
+      ],
+      chevrons: []
+    },
+    {
+      id: "N", name: "Nested if", nick: "A bypass on a bypass", color: RED,
+      desc: "An if inside an if: the inner test only happens on the outer test’s True branch. Indentation decides which if an else belongs to.",
+      skel: ["\u2039set up\u203a", "if \u2039condition 1\u203a:", "    if \u2039condition 2\u203a:", "        \u2039body if both True\u203a", "    else:", "        \u2039body if only 1 is True\u203a", "\u2039next\u203a"],
+      rows: [{ y: 0, x: 0, k: "stop" }, { y: 1, x: 0, k: "test" }, { y: 2, x: L, k: "test" }, { y: 3, x: 1.2, k: "stop" }, { y: 4, k: null }, { y: 5, x: L, k: "stop" }, { y: 6.8, x: 0, k: "stop" }],
+      tracks: [{ p: [[0, 1], [L, 1 + L], [L, 5.6]] }, { p: [[L, 2], [1.2, 2.6], [1.2, 5], [0, 6.2]] }],
+      edges: { "1>2": [[L, 1 + L]], "2>3": [[1.2, 2.6]], "3>6": [[1.2, 5], [0, 6.2]], "5>6": [[L, 5.6], [0, 6.2]] },
+      labels: [{ x: 0.78, y: 1.52, t: "True" }, { x: -0.22, y: 2.4, t: "False", a: "end" }, { x: 1.38, y: 2.52, t: "True" }],
+      chevrons: []
+    },
+    {
+      id: "4", name: "while", nick: "The loop", color: GREEN,
+      desc: "Set up, then test. True turns right round the loop and back to the test; False is the only way off.",
+      skel: ["\u2039set up\u203a", "while \u2039condition\u203a:", "    \u2039body\u203a", "    \u2039update\u203a", "\u2039next\u203a"],
+      rows: [{ y: 0, x: 0, k: "stop" }, { y: 1, x: 0, k: "test" }, { y: 2, x: L, k: "stop" }, { y: 3, x: L, k: "stop" }, { y: 4.6, x: 0, k: "stop" }],
+      tracks: [{ p: ring(0, 1, 3.6, RR) }],
+      edges: { "1>2": [[L, 1 + L]], "3>1": back(0, 1, 3.6, RR) },
+      labels: [{ x: 0.78, y: 1.55, t: "True" }, { x: -0.22, y: 2.8, t: "False", a: "end" }],
+      chevrons: [{ x: 1.5, y: 3.6, d: "right" }, { x: RR, y: 2.2, d: "up" }, { x: 1.5, y: 1 - L, d: "left" }]
+    },
+    {
+      id: "5", name: "for", nick: "The circuit", color: GREEN,
+      desc: "Each pass takes the next item and turns right round the loop. When nothing is left, the train carries straight on.",
+      skel: ["\u2039set up\u203a", "for \u2039item\u203a in \u2039sequence\u203a:", "    \u2039body\u203a", "\u2039next\u203a"],
+      rows: [{ y: 0, x: 0, k: "stop" }, { y: 1, x: 0, k: "test" }, { y: 2, x: L, k: "stop" }, { y: 3.6, x: 0, k: "stop" }],
+      tracks: [{ p: ring(0, 1, 2.6, RR) }],
+      edges: { "1>2": [[L, 1 + L]], "2>1": back(0, 1, 2.6, RR) },
+      labels: [{ x: 0.78, y: 1.55, t: "next item" }, { x: -0.22, y: 2.4, t: "none left", a: "end" }],
+      chevrons: [{ x: 1.5, y: 2.6, d: "right" }, { x: RR, y: 1.5, d: "up" }, { x: 1.5, y: 1 - L, d: "left" }]
+    },
+    {
+      id: "6", name: "Nested loops", nick: "A loop on a loop", color: GREEN, color2: LIME,
+      desc: "The inner loop is a second line, hung off the outer loop. It goes all the way round on every outer pass.",
+      skel: ["for \u2039outer\u203a in \u2039sequence 1\u203a:", "    for \u2039inner\u203a in \u2039sequence 2\u203a:", "        \u2039body\u203a", "    \u2039after the inner loop\u203a", "\u2039next\u203a"],
+      rows: [{ y: 0, x: 0, k: "test" }, { y: 1, x: L, k: "test" }, { y: 2, x: 1.2, k: "stop" }, { y: 3, x: L, k: "stop" }, { y: 4.6, x: 0, k: "stop" }],
+      tracks: [{ p: ring(0, 0, 3.6, 3.0) }, { p: ring(L, 1, 2.6, 2.4), c2: true }],
+      edges: {
+        "0>1": [[L, L]], "1>2": { p: [[1.2, 1.6]], c2: true }, "2>1": { p: back(L, 1, 2.6, 2.4), c2: true },
+        "3>0": back(0, 0, 3.6, 3.0)
+      },
+      labels: [{ x: -0.22, y: 2.3, t: "none left", a: "end" }],
+      chevrons: [
+        { x: 1.8, y: 3.6, d: "right" }, { x: 3.0, y: 1.5, d: "up" }, { x: 1.8, y: -0.6, d: "left" },
+        { x: 1.8, y: 2.6, d: "right" }, { x: 2.4, y: 1.5, d: "up" }, { x: 1.8, y: 0.4, d: "left" }
+      ]
+    },
+    {
+      id: "7", name: "Bounded while", nick: "The loop with a terminus", color: PURPLE,
+      desc: "A counter guarantees the loop ends. Afterwards, check which reason ended it.",
+      skel: ["\u2039set up\u203a", "steps = 0", "while \u2039condition\u203a and steps < \u2039max\u203a:", "    \u2039body\u203a", "    steps += 1", "if steps == \u2039max\u203a:", "    \u2039handle the limit\u203a", "\u2039next\u203a"],
+      rows: [{ y: 0, x: 0, k: "stop" }, { y: 1, x: 0, k: "stop" }, { y: 2, x: 0, k: "test" }, { y: 3, x: L, k: "stop" }, { y: 4, x: L, k: "stop" }, { y: 5.6, x: 0, k: "test" }, { y: 6.6, x: L, k: "stop" }, { y: 8.2, x: 0, k: "stop" }],
+      tracks: [{ p: ring(0, 2, 4.6, RR) }, { p: [[0, 5.6], [L, 6.2], [L, 7], [0, 7.6]] }],
+      edges: { "2>3": [[L, 2.6]], "4>2": back(0, 2, 4.6, RR), "5>6": [[L, 6.2]], "6>7": [[L, 7], [0, 7.6]] },
+      labels: [{ x: 0.78, y: 2.55, t: "True" }, { x: -0.22, y: 3.8, t: "False", a: "end" }, { x: 0.78, y: 6.12, t: "True" }, { x: -0.22, y: 6.8, t: "False", a: "end" }],
+      chevrons: [{ x: 1.5, y: 4.6, d: "right" }, { x: RR, y: 3.0, d: "up" }, { x: 1.5, y: 1.4, d: "left" }]
+    },
+    {
+      id: "B", name: "break", nick: "The emergency exit", color: ORANGE,
+      desc: "break is an emergency exit: straight out of the loop to the line after it, skipping any items left.",
+      skel: ["\u2039set up\u203a", "for \u2039item\u203a in \u2039sequence\u203a:", "    if \u2039found\u203a:", "        break", "    \u2039rest of body\u203a", "\u2039next\u203a"],
+      rows: [{ y: 0, x: 0, k: "stop" }, { y: 1, x: 0, k: "test" }, { y: 2, x: L, k: "test" }, { y: 3, x: 1.2, k: "stop" }, { y: 4, x: L, k: "stop" }, { y: 6.6, x: 0, k: "stop" }],
+      tracks: [{ p: ring(0, 1, 4.6, RR) }, { p: [[1.2, 4.3], [1.2, 4.9]], casing: true }, { p: [[L, 2], [1.2, 2.6], [1.2, 4.8], [0, 6]] }],
+      edges: { "1>2": [[L, 1.6]], "2>3": [[1.2, 2.6]], "3>5": [[1.2, 4.8], [0, 6]], "4>1": back(0, 1, 4.6, RR) },
+      labels: [{ x: 0.78, y: 1.55, t: "next item" }, { x: -0.22, y: 2.8, t: "none left", a: "end" }, { x: 1.2, y: 2.42, t: "True" }],
+      chevrons: [{ x: 1.8, y: 4.6, d: "right" }, { x: RR, y: 2.5, d: "up" }, { x: 1.5, y: 0.4, d: "left" }, { x: 1.2, y: 3.8, d: "down" }]
+    },
+    {
+      id: "C", name: "continue", nick: "The short turn", color: BLUE,
+      desc: "continue is a short turn: back to the top for the next item, skipping the rest of the body.",
+      skel: ["\u2039set up\u203a", "for \u2039item\u203a in \u2039sequence\u203a:", "    if \u2039skip this one\u203a:", "        continue", "    \u2039rest of body\u203a", "\u2039next\u203a"],
+      rows: [{ y: 0, x: 0, k: "stop" }, { y: 1, x: 0, k: "test" }, { y: 2, x: L, k: "test" }, { y: 3, x: 1.2, k: "stop" }, { y: 4, x: L, k: "stop" }, { y: 5.6, x: 0, k: "stop" }],
+      tracks: [{ p: ring(0, 1, 4.6, RR) }, { p: [[L, 2], [1.2, 2.6], [1.2, 3.4], [RR, 2.2]] }],
+      edges: { "1>2": [[L, 1.6]], "2>3": [[1.2, 2.6]], "3>1": [[1.2, 3.4], [RR, 2.2], [RR, 0.4], [L, 0.4]], "4>1": back(0, 1, 4.6, RR) },
+      labels: [{ x: 0.78, y: 1.55, t: "next item" }, { x: -0.22, y: 2.8, t: "none left", a: "end" }, { x: 1.2, y: 2.42, t: "True" }],
+      chevrons: [{ x: 1.5, y: 4.6, d: "right" }, { x: RR, y: 3.7, d: "up" }, { x: RR, y: 1.2, d: "up" }, { x: 1.5, y: 0.4, d: "left" }]
+    }
+  ];
+  SHAPES.forEach(function (s) {
+    var first = s.rows[0], last = s.rows[s.rows.length - 1];
+    s.start = [0, first.y - 0.85];
+    s.end = [0, last.y + 0.8];
+    s.tracks.unshift({ p: [s.start, s.end] });
+    s.traces = TRACES[s.id];
+  });
+
+  var KW = /\b(?:if|elif|else|while|for|in|is|break|continue|and|or|not|True|False|None)\b/;
+  var NS = "http://www.w3.org/2000/svg";
+  var TRACK_W = 0.2, CASE_W = 0.42, CODE_FS = 0.4, CHAR_W = 0.6, LABEL_FS = 0.25, CORNER = 0.3;
+  var reduce = window.matchMedia("(prefers-reduced-motion: reduce)");
+  var SPEEDS = { slow: { v: 2.2, dwell: 1.0 }, fast: { v: 5, dwell: 0.3 } };
+
+  var state = { si: 0, mode: "s", recall: false, view: "one", scen: 0, speed: "slow" };
+  var $ = function (id) { return document.getElementById(id); };
+
+  function svgEl(tag, attrs, parent) {
+    var e = document.createElementNS(NS, tag);
+    for (var k in attrs) e.setAttribute(k, attrs[k]);
+    if (parent) parent.appendChild(e);
+    return e;
+  }
+  function el(tag, cls, text) {
+    var e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text != null) e.textContent = text;
+    return e;
+  }
+
+  /* straight runs joined by corners of one radius, whatever the angle */
+  function roundedPath(pts, r) {
+    var d = "M" + pts[0][0] + " " + pts[0][1];
+    for (var i = 1; i < pts.length - 1; i++) {
+      var p0 = pts[i - 1], p1 = pts[i], p2 = pts[i + 1];
+      var ax = p1[0] - p0[0], ay = p1[1] - p0[1], bx = p2[0] - p1[0], by = p2[1] - p1[1];
+      var la = Math.hypot(ax, ay), lb = Math.hypot(bx, by);
+      if (la < 1e-9 || lb < 1e-9 || Math.abs(ax * by - ay * bx) < 1e-9) { d += " L" + p1[0] + " " + p1[1]; continue; }
+      var turn = Math.acos(Math.max(-1, Math.min(1, (ax * bx + ay * by) / (la * lb))));
+      var t = Math.min(r * Math.tan(turn / 2), la / 2, lb / 2);
+      d += " L" + (p1[0] - ax / la * t) + " " + (p1[1] - ay / la * t) +
+        " Q" + p1[0] + " " + p1[1] + " " + (p1[0] + bx / lb * t) + " " + (p1[1] + by / lb * t);
+    }
+    var last = pts[pts.length - 1];
+    return d + " L" + last[0] + " " + last[1];
+  }
+
+  function colourOf(shape, c2) { return c2 && shape.color2 ? shape.color2 : shape.color; }
+
+  function codeText(parent, str, x, y) {
+    var m = str.match(/^( *)(.*)$/);
+    var tx = x + m[1].length * CHAR_W * CODE_FS;
+    var t = svgEl("text", { x: tx, y: y + CODE_FS * 0.36, "font-size": CODE_FS, "class": "code-text" }, parent);
+    t.setAttributeNS("http://www.w3.org/XML/1998/namespace", "xml:space", "preserve");
+    var whole = new RegExp("^" + KW.source + "$");
+    m[2].split(/(\u2039[^\u203a]*\u203a)/).forEach(function (part) {
+      if (!part) return;
+      if (part.charAt(0) === "\u2039") { svgEl("tspan", { "class": "ph" }, t).textContent = part.slice(1, -1); return; }
+      part.split(new RegExp("(\"[^\"]*\"|" + KW.source + "|:$)")).forEach(function (bit) {
+        if (!bit) return;
+        svgEl("tspan", whole.test(bit) || bit === ":" ? { "class": "kw" } : {}, t).textContent = bit;
+      });
+    });
+    return { el: t, x: tx };
+  }
+
+  function bulletSvg(parent, shape, cx, cy, r) {
+    var g = svgEl("g", {}, parent);
+    svgEl("circle", { cx: cx, cy: cy, r: r, fill: shape.color, "class": "bul-ring", "stroke-width": r * 0.22 }, g);
+    var t = svgEl("text", { x: cx, y: cy + r * 0.36, "text-anchor": "middle", "font-size": r * 1.05, "class": "bul-text" }, g);
+    t.textContent = shape.id;
+    return g;
+  }
+
+  function chevron(parent, c) {
+    var s = 0.1, k = 0.7, d;
+    if (c.d === "up") d = [[c.x - s, c.y + s * k], [c.x, c.y - s * k], [c.x + s, c.y + s * k]];
+    else if (c.d === "down") d = [[c.x - s, c.y - s * k], [c.x, c.y + s * k], [c.x + s, c.y - s * k]];
+    else if (c.d === "left") d = [[c.x + s * k, c.y - s], [c.x - s * k, c.y], [c.x + s * k, c.y + s]];
+    else d = [[c.x - s * k, c.y - s], [c.x + s * k, c.y], [c.x - s * k, c.y + s]];
+    svgEl("path", { d: "M" + d.map(function (p) { return p[0] + " " + p[1]; }).join(" L"), fill: "none", stroke: "#fff",
+      "stroke-width": 0.055, "stroke-linecap": "round", "stroke-linejoin": "round" }, parent);
+  }
+
+  function drawShape(shape, lines) {
+    var svg = svgEl("svg", { role: "img" });
+    svg.setAttribute("aria-label", shape.name + ": " + shape.desc);
+    var root = svgEl("g", {}, svg);
+    var maxX = 0;
+    shape.tracks.forEach(function (tk) { tk.p.forEach(function (p) { maxX = Math.max(maxX, p[0]); }); });
+    var codeX = maxX + 1.0;
+    var bands = svgEl("g", {}, root);
+    var base = svgEl("g", { "class": "base" }, root);
+    var trail = svgEl("g", {}, root);
+    var marks = svgEl("g", {}, root);
+    var textLayer = svgEl("g", {}, root);
+    var trainLayer = svgEl("g", {}, root);
+
+    shape.tracks.forEach(function (tk) {
+      var d = roundedPath(tk.p, CORNER);
+      if (tk.casing) { svgEl("path", { d: d, fill: "none", "class": "casing", "stroke-width": CASE_W }, base); return; }
+      svgEl("path", { d: d, fill: "none", stroke: colourOf(shape, tk.c2), "stroke-width": TRACK_W, "stroke-linejoin": "round" }, base);
+    });
+    shape.chevrons.forEach(function (c) { chevron(marks, c); });
+    shape.labels.forEach(function (lb) {
+      svgEl("text", { x: lb.x, y: lb.y, "font-size": LABEL_FS, "class": "hint", "text-anchor": lb.a === "end" ? "end" : "start" }, marks).textContent = lb.t;
+    });
+    bulletSvg(marks, shape, 0, shape.start[1] - 0.42, 0.34);
+
+    var rows = [];
+    shape.rows.forEach(function (row, i) {
+      var g = svgEl("g", { "class": "row" }, textLayer);
+      var ct = codeText(g, lines[i], codeX, row.y);
+      if (row.k === "test") svgEl("circle", { cx: row.x, cy: row.y, r: 0.17, "class": "st-test", "stroke-width": 0.06 }, marks);
+      else if (row.k === "stop") svgEl("circle", { cx: row.x, cy: row.y, r: 0.12, "class": "st-stop" }, marks);
+      rows.push({ g: g, text: ct.el, tx: ct.x, y: row.y, x: row.x, k: row.k });
+    });
+    return { svg: svg, root: root, bands: bands, trail: trail, rows: rows, trainLayer: trainLayer, shape: shape };
+  }
+
+  function finishShape(h, ppu) {
+    var bb = h.root.getBBox();
+    var pad = 0.25;
+    var x0 = bb.x - pad, y0 = bb.y - pad, w = bb.width + 2 * pad, ht = bb.height + 2 * pad;
+    h.svg.setAttribute("viewBox", x0 + " " + y0 + " " + w + " " + ht);
+    h.svg.setAttribute("width", Math.round(w * ppu));
+    h.svg.setAttribute("height", Math.round(ht * ppu));
+    h.rows.forEach(function (r) {
+      var band = svgEl("rect", { x: x0, y: r.y - 0.46, width: w, height: 0.92, rx: 0.12, "class": "band" }, h.bands);
+      r.run = svgEl("rect", { x: x0, y: r.y - 0.46, width: w, height: 0.92, rx: 0.12, "class": "runband", fill: h.shape.color }, h.bands);
+      var hit = svgEl("rect", { x: r.tx - 0.2, y: r.y - 0.46, width: Math.max(1, x0 + w - r.tx + 0.2), height: 0.92, fill: "transparent" });
+      r.g.insertBefore(hit, r.g.firstChild);
+      r.g.addEventListener("mouseenter", function () { band.classList.add("hover"); });
+      r.g.addEventListener("mouseleave", function () { band.classList.remove("hover"); });
+      var tb = r.text.getBBox();
+      var blank = svgEl("rect", { x: r.tx, y: r.y - 0.2, width: Math.max(0.6, tb.width - (r.tx - tb.x)), height: 0.4, rx: 0.08, "class": "blankbar" }, r.g);
+      blank.addEventListener("click", function () { r.g.classList.add("revealed"); });
+    });
+  }
+
+  function bulletEl(shape) {
+    var b = el("span", "bullet", shape.id);
+    b.setAttribute("aria-hidden", "true");
+    b.style.setProperty("--c", shape.color);
+    return b;
+  }
+
+  /* ---------- routes down the side ---------- */
+  var routeBtns = [];
+  SHAPES.forEach(function (shape, i) {
+    var b = el("button", "routebtn");
+    b.type = "button";
+    b.appendChild(bulletEl(shape));
+    var t = el("span");
+    t.appendChild(el("b", null, shape.name));
+    t.appendChild(el("small", null, shape.nick));
+    b.appendChild(t);
+    b.setAttribute("aria-label", shape.name + ", " + shape.nick + ", key " + shape.id);
+    b.addEventListener("click", function () { choose(i); });
+    $("routes").appendChild(b);
+    routeBtns.push(b);
+    $("allBullets").appendChild(bulletEl(shape));
+  });
+
+  function linesFor(shape) {
+    return state.mode === "e" ? shape.traces[Math.min(state.scen, shape.traces.length - 1)].code : shape.skel;
+  }
+
+  /* ---------- one-line view ---------- */
+  var current = null;
+  function renderOne() {
+    resetTrace(true);
+    var shape = SHAPES[state.si];
+    var hb = $("headBullet");
+    hb.style.setProperty("--c", shape.color);
+    hb.textContent = shape.id;
+    $("headName").textContent = shape.name;
+    $("headNick").textContent = shape.nick;
+    $("headDesc").textContent = shape.desc;
+    $("final").style.setProperty("--c", shape.color);
+    var fig = $("figure");
+    fig.textContent = "";
+    var h = drawShape(shape, linesFor(shape));
+    if (state.recall) h.svg.classList.add("hidden-code");
+    fig.appendChild(h.svg);
+    finishShape(h, window.innerWidth < 600 ? 40 : 56);
+    current = h;
+    renderScenarios();
+    idlePanel();
+  }
+
+  function renderScenarios() {
+    var shape = SHAPES[state.si];
+    var box = $("scenarios");
+    box.textContent = "";
+    shape.traces.forEach(function (tr, i) {
+      var b = el("button", null, tr.label);
+      b.type = "button";
+      b.setAttribute("aria-pressed", state.mode === "e" && i === state.scen ? "true" : "false");
+      b.addEventListener("click", function () { state.scen = i; if (state.mode !== "e") setMode("e"); else renderOne(); });
+      box.appendChild(b);
+    });
+  }
+
+  /* ---------- pocket map ---------- */
+  function renderPocket() {
+    var box = $("pocket");
+    box.textContent = "";
+    var handles = [];
+    SHAPES.forEach(function (shape) {
+      var card = el("article", "card");
+      var sign = el("div", "sign");
+      sign.appendChild(bulletEl(shape));
+      sign.appendChild(el("b", null, shape.name));
+      sign.appendChild(el("span", "n", shape.nick));
+      card.appendChild(sign);
+      var h = drawShape(shape, state.mode === "e" ? shape.traces[0].code : shape.skel);
+      if (state.recall) h.svg.classList.add("hidden-code");
+      card.appendChild(h.svg);
+      box.appendChild(card);
+      handles.push(h);
+    });
+    handles.forEach(function (h) { finishShape(h, 26); });
+  }
+
+  /* ---------- trace panel ---------- */
+  function idlePanel() {
+    var now = $("now");
+    now.textContent = "";
+    now.appendChild(el("p", "none", state.mode === "e"
+      ? "Press Run, or Step, to follow this example line by line."
+      : "Choose an input above, or press Run: the example code takes the skeleton’s place."));
+    $("vars").textContent = "";
+    $("vars").appendChild(el("p", "none", "None yet"));
+    $("soFar").textContent = "";
+    var fin = $("final");
+    fin.className = "final";
+    fin.textContent = "";
+    fin.appendChild(el("span", "none", "Appears when the train reaches the end of the line."));
+  }
+
+  function showStep(k) {
+    var shape = SHAPES[state.si];
+    var tr = shape.traces[state.scen];
+    var st = tr.steps[k];
+    var now = $("now");
+    now.textContent = "";
+    var head = el("div");
+    var chip = el("span", "chip", "Line " + (st.row + 1));
+    chip.style.setProperty("--c", shape.color);
+    head.appendChild(chip);
+    head.appendChild(el("code", null, tr.code[st.row].trim()));
+    now.appendChild(head);
+    if (st.test) {
+      var box = el("div", "tparts");
+      st.test.parts.forEach(function (p, i) {
+        if (i > 0) box.appendChild(el("div", "op", st.test.op));
+        var row = el("div");
+        row.appendChild(el("span", null, p.src));
+        if (p.skipped) { row.appendChild(el("span", "arrow", "\u2192")); row.appendChild(el("span", "skip", "not checked")); }
+        else {
+          if (p.sub) { row.appendChild(el("span", "arrow", "\u2192")); row.appendChild(el("span", null, p.sub)); }
+          row.appendChild(el("span", "arrow", "\u2192"));
+          row.appendChild(el("span", "v", p.val));
+        }
+        box.appendChild(row);
+      });
+      now.appendChild(box);
+    }
+    if (st.take && st.take.value != null) {
+      var tb = el("div", "tparts");
+      var r2 = el("div");
+      r2.appendChild(el("span", null, st.take.target));
+      r2.appendChild(el("span", "arrow", "\u2190"));
+      r2.appendChild(el("span", "v", st.take.value));
+      tb.appendChild(r2);
+      now.appendChild(tb);
+    }
+    now.appendChild(el("p", null, st.say));
+
+    var dl = $("vars");
+    dl.textContent = "";
+    var names = Object.keys(st.vars);
+    if (!names.length) dl.appendChild(el("p", "none", "None yet"));
+    names.forEach(function (n) {
+      dl.appendChild(el("dt", null, n));
+      var dd = el("dd", null, st.vars[n]);
+      if (st.changed && st.changed.indexOf(n) >= 0) dd.classList.add("chg");
+      dl.appendChild(dd);
+    });
+    var so = $("soFar");
+    so.textContent = tr.output.slice(0, st.out);
+    so.scrollTop = so.scrollHeight;
+  }
+
+  function showEnd() {
+    var shape = SHAPES[state.si];
+    var tr = shape.traces[state.scen];
+    var now = $("now");
+    now.textContent = "";
+    now.appendChild(el("p", null, "The train reaches the end of the line: the program has finished."));
+    $("soFar").textContent = tr.output;
+    var fin = $("final");
+    fin.className = "final done";
+    fin.textContent = tr.output.replace(/\n$/, "");
+  }
+
+  /* ---------- the train ---------- */
+  var T = null;
+  function buildLegs(shape, steps) {
+    var legs = [];
+    steps.forEach(function (st, k) {
+      var to = shape.rows[st.row];
+      var pts, c2 = false;
+      if (k === 0) pts = [shape.start, [to.x, to.y]];
+      else {
+        var fr = shape.rows[steps[k - 1].row];
+        var e = shape.edges[steps[k - 1].row + ">" + st.row] || [];
+        var way = Array.isArray(e) ? e : e.p;
+        c2 = !Array.isArray(e) && !!e.c2;
+        pts = [[fr.x, fr.y]].concat(way, [[to.x, to.y]]);
+      }
+      legs.push({ pts: pts, step: k, c2: c2 });
+    });
+    var last = shape.rows[steps[steps.length - 1].row];
+    legs.push({ pts: [[last.x, last.y], shape.end], step: -1 });
+    return legs;
+  }
+
+  function setRunUI() {
+    var playing = T && T.playing;
+    var done = T && T.done;
+    $("runText").textContent = playing ? "Pause" : "Run";
+    $("runIcon").setAttribute("d", playing ? "M6.5 4.5h4v15h-4zM13.5 4.5h4v15h-4z" : "M7 4.5v15l13-7.5z");
+    $("step").disabled = !!done;
+  }
+
+  function resetTrace(silent) {
+    if (T) { if (T.raf) cancelAnimationFrame(T.raf); clearTimeout(T.timer); }
+    T = null;
+    if (current) {
+      current.trail.textContent = "";
+      current.trainLayer.textContent = "";
+      current.svg.classList.remove("tracing");
+      current.rows.forEach(function (r) { if (r.run) r.run.setAttribute("class", "runband"); });
+    }
+    if (!silent) idlePanel();
+    setRunUI();
+  }
+
+  function ensureTrace() {
+    if (state.mode !== "e") { setMode("e"); }
+    if (T && !T.done) return true;
+    if (T && T.done) resetTrace(true);
+    var shape = SHAPES[state.si];
+    var tr = shape.traces[state.scen];
+    T = { legs: buildLegs(shape, tr.steps), i: 0, playing: false, busy: false, done: false, lit: -1 };
+    var s0 = shape.start;
+    T.train = bulletSvg(current.trainLayer, shape, s0[0], s0[1], 0.27);
+    T.ox = s0[0]; T.oy = s0[1];
+    current.svg.classList.add("tracing");
+    return true;
+  }
+
+  function light(rowIndex) {
+    current.rows.forEach(function (r, k) {
+      if (!r.run) return;
+      var cls = r.run.getAttribute("class");
+      if (k === rowIndex) r.run.setAttribute("class", "runband ran now");
+      else if (cls.indexOf("now") >= 0) r.run.setAttribute("class", "runband ran");
+    });
+  }
+
+  function advance() {
+    if (!T || T.busy || T.done) return;
+    var leg = T.legs[T.i];
+    var shape = SHAPES[state.si];
+    T.busy = true;
+    var p = svgEl("path", { d: roundedPath(leg.pts, CORNER), fill: "none", stroke: colourOf(shape, leg.c2), "stroke-width": TRACK_W, "stroke-linejoin": "round" }, current.trail);
+    var len = p.getTotalLength();
+    p.setAttribute("stroke-dasharray", len + " " + len);
+    p.setAttribute("stroke-dashoffset", len);
+    var sp = SPEEDS[state.speed];
+    var dur = reduce.matches ? 0 : (len / sp.v) * 1000;
+    var t0 = null;
+    function frame(ts) {
+      if (!T) return;
+      if (t0 === null) t0 = ts;
+      var f = dur ? Math.min(1, (ts - t0) / dur) : 1;
+      var pt = p.getPointAtLength(f * len);
+      T.train.setAttribute("transform", "translate(" + (pt.x - T.ox) + " " + (pt.y - T.oy) + ")");
+      p.setAttribute("stroke-dashoffset", len * (1 - f));
+      if (f < 1) { T.raf = requestAnimationFrame(frame); return; }
+      T.busy = false;
+      T.i++;
+      if (leg.step >= 0) {
+        var st = SHAPES[state.si].traces[state.scen].steps[leg.step];
+        light(st.row);
+        showStep(leg.step);
+      } else {
+        light(-1);
+        showEnd();
+        T.done = true;
+        T.playing = false;
+        setRunUI();
+        return;
+      }
+      if (T.playing) T.timer = setTimeout(advance, (reduce.matches ? 0.8 : sp.dwell) * 1000);
+      setRunUI();
+    }
+    T.raf = requestAnimationFrame(frame);
+  }
+
+  function play() {
+    if (T && T.done) resetTrace(true);
+    ensureTrace();
+    T.playing = true;
+    setRunUI();
+    if (!T.busy) advance();
+  }
+  function pause() { if (T) { T.playing = false; clearTimeout(T.timer); } setRunUI(); }
+  function step() {
+    ensureTrace();
+    if (T.done) return;
+    T.playing = false;
+    clearTimeout(T.timer);
+    setRunUI();
+    if (!T.busy) advance();
+  }
+  $("run").addEventListener("click", function () { if (T && T.playing) pause(); else play(); });
+  $("step").addEventListener("click", step);
+  $("reset").addEventListener("click", function () { resetTrace(false); });
+  function setSpeed(s) {
+    state.speed = s;
+    $("slow").setAttribute("aria-pressed", s === "slow" ? "true" : "false");
+    $("fast").setAttribute("aria-pressed", s === "fast" ? "true" : "false");
+  }
+  $("slow").addEventListener("click", function () { setSpeed("slow"); });
+  $("fast").addEventListener("click", function () { setSpeed("fast"); });
+
+  /* ---------- state ---------- */
+  function choose(i) {
+    state.si = i;
+    state.scen = 0;
+    routeBtns.forEach(function (b, k) { b.setAttribute("aria-pressed", k === i ? "true" : "false"); });
+    if (state.view !== "one") setView("one");
+    else renderOne();
+  }
+  function setMode(m) {
+    state.mode = m;
+    $("skel").setAttribute("aria-pressed", m === "s" ? "true" : "false");
+    $("ex").setAttribute("aria-pressed", m === "e" ? "true" : "false");
+    rerender();
+  }
+  function setRecall(on) {
+    state.recall = on;
+    document.body.classList.toggle("recall", on);
+    $("recall").setAttribute("aria-pressed", on ? "true" : "false");
+    $("recall").textContent = on ? "Show the code" : "Hide the code";
+    rerender();
+  }
+  function setView(v) {
+    state.view = v;
+    $("viewOne").setAttribute("aria-pressed", v === "one" ? "true" : "false");
+    $("viewAll").setAttribute("aria-pressed", v === "all" ? "true" : "false");
+    $("stage").hidden = v !== "one";
+    $("mapAll").hidden = v !== "all";
+    rerender();
+  }
+  function rerender() {
+    if (state.view === "one") renderOne();
+    else { resetTrace(true); renderPocket(); }
+  }
+  function setBg(white) {
+    document.body.classList.toggle("paper", white);
+    $("bgBlack").setAttribute("aria-pressed", white ? "false" : "true");
+    $("bgWhite").setAttribute("aria-pressed", white ? "true" : "false");
+    try { localStorage.setItem("cf-map-bg", white ? "white" : "black"); } catch (err) { /* storage unavailable */ }
+  }
+  $("skel").addEventListener("click", function () { setMode("s"); });
+  $("ex").addEventListener("click", function () { setMode("e"); });
+  $("recall").addEventListener("click", function () { setRecall(!state.recall); });
+  $("viewOne").addEventListener("click", function () { setView("one"); });
+  $("viewAll").addEventListener("click", function () { setView("all"); });
+  $("bgBlack").addEventListener("click", function () { setBg(false); });
+  $("bgWhite").addEventListener("click", function () { setBg(true); });
+  try { if (localStorage.getItem("cf-map-bg") === "white") setBg(true); } catch (err) { /* storage unavailable */ }
+
+  document.addEventListener("keydown", function (e) {
+    var t = e.target;
+    if (e.altKey || e.ctrlKey || e.metaKey) return;
+    if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT" || t.isContentEditable)) return;
+    var k = e.key.length === 1 ? e.key.toUpperCase() : e.key;
+    for (var i = 0; i < SHAPES.length; i++) if (SHAPES[i].id === k) { choose(i); return; }
+    if (k === "ArrowDown") { e.preventDefault(); choose((state.si + 1) % SHAPES.length); }
+    else if (k === "ArrowUp") { e.preventDefault(); choose((state.si + SHAPES.length - 1) % SHAPES.length); }
+    else if (k === " " && t.tagName !== "BUTTON") { e.preventDefault(); if (T && T.playing) pause(); else play(); }
+    else if (k === "S") { step(); }
+    else if (k === "R") { resetTrace(false); }
+    else if (k === "H") { setRecall(!state.recall); }
+    else if (k === "E") { setMode(state.mode === "s" ? "e" : "s"); }
+    else if (k === "P") { setView(state.view === "one" ? "all" : "one"); }
+    else if (k === "W") { setBg(!document.body.classList.contains("paper")); }
+  });
+
+  var small = window.innerWidth < 600;
+  window.addEventListener("resize", function () {
+    if ((window.innerWidth < 600) !== small) { small = window.innerWidth < 600; if (state.view === "one") renderOne(); }
+  });
+
+  choose(0);
+  /* re-measure once the mono font has arrived */
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { if (!T) rerender(); });
+})();
+</script>
+</body>
+</html>
