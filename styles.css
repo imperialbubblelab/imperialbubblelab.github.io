@@ -192,6 +192,21 @@ a:hover, a:focus { text-decoration-thickness: 2px; }
   /* filter: grayscale(1) contrast(1.1); */
 }
 
+.research-topics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 2rem;
+  margin-top: var(--space);
+}
+.research-topic { min-width: 0; }
+.research-topic a { display: block; width: 100%; }
+.research-topic img { display: block; width: 100%; height: auto; }
+.research-topic a:hover,
+.research-topic a:focus-visible { outline: 2px solid #000; outline-offset: 4px; }
+@media (max-width: 520px) {
+  .research-topics { grid-template-columns: minmax(0, 1fr); }
+}
+
 /* Course directory: route bullets and Helvetica lettering from the gyms. */
 .computing {
   font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;

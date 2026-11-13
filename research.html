@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="description" content="Research — BubbleLab." />
     <title>BubbleLab — Research</title>
-    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="styles.css?v=research-columns-1" />
     <link rel="stylesheet" href="vendor/katex/katex.min.css" />
   </head>
   <body>
@@ -15,9 +15,23 @@
         <figure class="hero">
           <img src="assets/bubble3.jpg" alt="BubbleLab illustrative image" />
         </figure>
-      <section class="section">
-        <img src="assets/bubbleresearch.png" alt="Research Overview" style="width: 100%; max-width: 100%; margin-top: -60px;" />
-      </section>
+      <div class="research-topics">
+        <section class="research-topic" aria-label="Pattern formation and bubbles">
+          <a href="assets/bubbleresearch.png">
+            <img src="assets/topic1.png" alt="Pattern formation + Bubbles — view research overview" />
+          </a>
+        </section>
+        <section class="research-topic" aria-label="Machine learning and maths">
+          <a href="assets/Ntioudis_Shen2026.pdf">
+            <img src="assets/topic2.png" alt="Machine Learning + Maths — read Ntioudis and Shen (2026), PDF" />
+          </a>
+        </section>
+        <section class="research-topic" aria-label="Global optimality problems">
+          <a href="https://arxiv.org/abs/2611.09925">
+            <img src="assets/topic3.png" alt="Global Optimality Problems — read the paper on arXiv" />
+          </a>
+        </section>
+      </div>
 
       <div data-include="partials/footer.html"></div>
     </main>
