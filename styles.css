@@ -13,10 +13,9 @@ html { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; 
   --tab-home: #000000;      /* black */
   --tab-news: #D81B24;      /* red */
   --tab-research: #0057A3;  /* blue */
-  --tab-teaching: #2E7D32;  /* green */
+  --tab-teaching: #e8f31c;  /* yellow */
   --tab-publications: #F57C00; /* orange */
   --tab-notes: #000000;     /* notes */
-  --tab-blog: #e8f31c;      /* purple */
 }
 
 body {
@@ -149,14 +148,14 @@ a:hover, a:focus { text-decoration-thickness: 2px; }
   background: #f5f5f5;
 }
 
-/* Blog button inverted (black background, white text) */
-.nav a[data-tab="blog"] {
+/* Teaching button inverted (black background, white text) */
+.nav a[data-tab="teaching"] {
   background: #000;
   color: #fff;
   border-color: #000;
 }
-.nav a[data-tab="blog"]:hover,
-.nav a[data-tab="blog"]:focus {
+.nav a[data-tab="teaching"]:hover,
+.nav a[data-tab="teaching"]:focus {
   background: #111;
 }
 
@@ -176,7 +175,6 @@ a:hover, a:focus { text-decoration-thickness: 2px; }
   .nav a[data-tab="teaching"][aria-current="page"] { --active-color: var(--tab-teaching); }
   .nav a[data-tab="publications"][aria-current="page"] { --active-color: var(--tab-publications); }
   .nav a[data-tab="notes"][aria-current="page"] { --active-color: var(--tab-notes); }
-  .nav a[data-tab="blog"][aria-current="page"] { --active-color: var(--tab-blog); }
 
 /* News list */
 .news { list-style: none; padding: 0; margin: 0; }
@@ -192,6 +190,62 @@ a:hover, a:focus { text-decoration-thickness: 2px; }
   margin-right: auto;
   height: auto;
   /* filter: grayscale(1) contrast(1.1); */
+}
+
+/* Course directory: route bullets and Helvetica lettering from the gyms. */
+.computing {
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+}
+.gym-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1.75rem 1.25rem;
+  list-style: none;
+  margin: 1.5rem 0 2rem;
+  padding: 0;
+}
+.section .gym-grid li { text-align: left; }
+.gym-link {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1rem;
+  height: 100%;
+  padding: 1rem 0 .5rem;
+  border-top: 4px solid #000;
+  text-decoration: none;
+}
+.gym-icon {
+  display: grid;
+  place-items: center;
+  width: 4.5rem;
+  height: 4.5rem;
+  flex: none;
+  border-radius: 50%;
+  background: var(--route-color);
+  color: var(--route-ink, #fff);
+  font-family: Helvetica, Arial, sans-serif;
+  font-size: 3rem;
+  font-weight: 700;
+  line-height: 1;
+}
+/* Lecture numbers use the subway colors from the teaching resources. */
+.gym-icon--loops { --route-color: #00933C; }
+.gym-icon--decisions { --route-color: #EE352E; }
+.gym-icon--data { --route-color: #2850AD; }
+.gym-icon--algorithms { --route-color: #B933AD; }
+.gym-icon--numpy { --route-color: #FF6319; }
+.gym-name {
+  font-size: 1.05rem;
+  font-weight: 700;
+  line-height: 1.2;
+  text-wrap: balance;
+}
+.gym-link:hover .gym-name,
+.gym-link:focus-visible .gym-name { text-decoration: underline; }
+.gym-link:focus-visible { outline: 2px solid #000; outline-offset: 5px; }
+@media (max-width: 520px) {
+  .gym-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 /* About page two-column layout */

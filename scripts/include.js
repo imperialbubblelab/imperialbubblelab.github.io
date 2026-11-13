@@ -25,10 +25,10 @@
         else a.removeAttribute('aria-current');
       });
 
-      // Mark Blog active on any blog subpage
-      if (/\/blog\//.test(location.pathname)) {
-        const blogLink = nav.querySelector('a[data-tab="blog"]');
-        if (blogLink) blogLink.setAttribute('aria-current', 'page');
+      // Mark Teaching active on any teaching subpage
+      if (/\/teaching\//.test(location.pathname)) {
+        const teachingLink = nav.querySelector('a[data-tab="teaching"]');
+        if (teachingLink) teachingLink.setAttribute('aria-current', 'page');
       }
 
       // No dropdowns: simplified nav

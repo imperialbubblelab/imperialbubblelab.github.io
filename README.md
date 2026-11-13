@@ -4,7 +4,7 @@ Monochrome Academic Website
 Overview
 --------
 - Text-only, black-and-white, single centered column (document-like).
-- Multi-page: Home, About, News, Research, Teaching, Publications, Notes, Blog.
+- Multi-page: Home, About, News, Research, Teaching, Publications, Notes.
 - No images, no JavaScript build tooling.
 
 - Quick Start
@@ -15,13 +15,12 @@ Overview
   - `index.html` — Home
   - `about.html` — About page
   - `news.html` — News
-  - `blog/` — Folder containing individual blog posts (HTML files)
   - `notes.html` — Notes
   - `research.html` — Research summary and math examples
   
-  - `teaching.html` — Courses
+  - `teaching.html` — Teaching page
   - `publications.html` — Selected publications
-  - `blog.html` — Placeholder for posts
+  - `blog.html` — Redirect to Teaching
   - `styles.css` — Shared styles
 - Optional: Link a CV by replacing the `#` in Home’s contact with a file path (e.g., `cv.pdf`).
 
@@ -71,17 +70,18 @@ Research Page
 - Active Tab Colors
 - -----------------
 - Edit per-tab colors in `styles.css` under `:root` via CSS variables:
-  - `--tab-about`, `--tab-home`, `--tab-news`, `--tab-research`, `--tab-teaching`, `--tab-publications`, `--tab-notes`, `--tab-blog`
+  - `--tab-about`, `--tab-home`, `--tab-news`, `--tab-research`, `--tab-teaching`, `--tab-publications`, `--tab-notes`
 - Colors are grayscale by default to keep the monochrome style; you can set them to brand colors if desired.
 
 Deployment
 ----------
 - Host these files on any static host (GitHub Pages, university web space, etc.).
 
-Blog Posts
-----------
-- Add new posts as standalone HTML files under `blog/` (e.g., `blog/2025-10-01-my-note.html`).
-- Link them from `blog.html` to appear in the list. The nav automatically marks Blog active on subpages.
+Teaching
+--------
+- Edit `teaching.html` to add teaching content.
+- Teaching resources live under `teaching/`. The nav automatically marks Teaching active on subpages.
+- The former `blog.html` URL redirects to `teaching.html`.
 
 Local LaTeX (KaTeX)
 -------------------

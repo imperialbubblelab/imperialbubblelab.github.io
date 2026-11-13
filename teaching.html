@@ -13,13 +13,44 @@
     <main id="main" class="page" role="main">
       <div data-include="partials/header.html"></div>
 
-      <section class="section">
-        <h2>Teaching</h2>
-        <ul>
-          <li>Course ABC — Institution (Term, Year).</li>
-          <li>Course XYZ — Institution (Term, Year).
+      <div class="hero">
+        <img src="assets/bird.jpg" alt="Bird" />
+      </div>
+
+      <section class="section computing" aria-labelledby="computing-title">
+        <h2 id="computing-title">ME1 Computing</h2>
+        <p>The following gyms contain exercises for the computing course. The numbers indicate the lectures they correspond to. A Goldilocks path offers a reduced set of exercises covering the main material.</p>
+        <ul class="gym-grid">
+          <li>
+            <a class="gym-link" href="teaching/ME1Computing/loop_gym.html">
+              <span class="gym-icon gym-icon--loops" aria-hidden="true">2</span>
+              <span class="gym-name">Loop Gym</span>
+            </a>
           </li>
-          <li>Course DEF — Institution (Term, Year).</li>
+          <li>
+            <a class="gym-link" href="teaching/ME1Computing/control_gym.html">
+              <span class="gym-icon gym-icon--decisions" aria-hidden="true">3</span>
+              <span class="gym-name">Control Flow Gym</span>
+            </a>
+          </li>
+          <li>
+            <a class="gym-link" href="teaching/ME1Computing/data_structures_gym.html">
+              <span class="gym-icon gym-icon--data" aria-hidden="true">4</span>
+              <span class="gym-name">Data Structures Gym</span>
+            </a>
+          </li>
+          <li>
+            <a class="gym-link" href="teaching/ME1Computing/algorithms_gym.html">
+              <span class="gym-icon gym-icon--algorithms" aria-hidden="true">5</span>
+              <span class="gym-name">Algorithms and Complexity Gym</span>
+            </a>
+          </li>
+          <li>
+            <a class="gym-link" href="teaching/ME1Computing/numpy_gym.html">
+              <span class="gym-icon gym-icon--numpy" aria-hidden="true">6</span>
+              <span class="gym-name">NumPy and Matplotlib Gym</span>
+            </a>
+          </li>
         </ul>
       </section>
 
